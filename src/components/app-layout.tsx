@@ -1,9 +1,12 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, ListPlus, Target, User, LogOut, Store } from "lucide-react";
-import { auth } from "@/lib/auth";
+import {
+  LayoutDashboard, ListPlus, Target, User, LogOut, Store, ShieldCheck,
+} from "lucide-react";
+import { authApi } from "@/lib/auth";
+import { useIsAdmin } from "@/hooks/use-profile";
 import { cn } from "@/lib/utils";
 
-const items = [
+const baseItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/lancamentos", label: "Lançamentos", icon: ListPlus },
   { to: "/metas", label: "Metas", icon: Target },
@@ -13,6 +16,11 @@ const items = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const { data: isAdmin } = useIsAdmin();
+
+  const items = isAdmin
+    ? [...baseItems, { to: "/admin" as const, label: "Admin", icon: ShieldCheck }]
+    : baseItems;
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
@@ -47,8 +55,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <button
-          onClick={() => {
-            auth.logout();
+          onClick={async () => {
+            await authApi.signOut();
             navigate({ to: "/" });
           }}
           className="m-3 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"

@@ -4,23 +4,32 @@ import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { useVendas } from "@/lib/vendas-store";
-import { METAS, comissaoValor, formatBRL } from "@/lib/mock-data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSales } from "@/hooks/use-sales";
+import { useMyGoals } from "@/hooks/use-goals";
+import { METAS_DEFAULT, formatBRL } from "@/lib/mock-data";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { TrendingUp, Wallet, Smartphone, Headphones } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
 type Range = "hoje" | "7" | "30";
 
 function Dashboard() {
-  const vendas = useVendas();
+  const { data: vendas = [], isLoading } = useSales();
+  const { data: goals = [] } = useMyGoals();
   const [range, setRange] = useState<Range>("7");
+
+  const goalFor = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
+    goals.find((g) => g.target_type === type && g.category_focus === focus)?.target_value ??
+    (focus === "acessorios" ? METAS_DEFAULT.acessoriosMensal :
+      type === "diaria" ? METAS_DEFAULT.diaria :
+      type === "semanal" ? METAS_DEFAULT.semanal : METAS_DEFAULT.mensal);
 
   const now = new Date();
   const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
@@ -28,14 +37,14 @@ function Dashboard() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const totalIn = (from: Date) =>
-    vendas.filter((v) => new Date(v.data) >= from).reduce((s, v) => s + v.valor, 0);
+    vendas.filter((v) => new Date(v.sale_date) >= from).reduce((s, v) => s + Number(v.sale_value), 0);
 
   const totalDia = totalIn(startOfDay);
   const totalSemana = totalIn(startOfWeek);
   const totalMes = totalIn(startOfMonth);
 
-  const comissoes = vendas.reduce((s, v) => s + comissaoValor(v), 0);
-  const comissoesAparelhos = vendas.filter(v => v.categoria === "Aparelho").reduce((s, v) => s + comissaoValor(v), 0);
+  const comissoes = vendas.reduce((s, v) => s + Number(v.commission_value), 0);
+  const comissoesAparelhos = vendas.filter(v => v.category === "Aparelho").reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAcessorios = comissoes - comissoesAparelhos;
 
   const lineData = useMemo(() => {
@@ -44,13 +53,14 @@ function Dashboard() {
       const day = new Date(now); day.setDate(now.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
       const next = new Date(day); next.setDate(day.getDate() + 1);
       const total = vendas
-        .filter(v => { const d = new Date(v.data); return d >= day && d < next; })
-        .reduce((s, v) => s + v.valor, 0);
+        .filter(v => { const d = new Date(v.sale_date); return d >= day && d < next; })
+        .reduce((s, v) => s + Number(v.sale_value), 0);
       return {
         label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
         valor: total,
       };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendas, range]);
 
   const pieData = [
@@ -66,11 +76,17 @@ function Dashboard() {
         <p className="text-sm text-muted-foreground mt-1">Acompanhe o progresso de metas e comissões em tempo real.</p>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3 mb-6">
-        <KpiCard title="Meta Diária" current={totalDia} target={METAS.diaria} delay={0} />
-        <KpiCard title="Meta Semanal" current={totalSemana} target={METAS.semanal} delay={80} />
-        <KpiCard title="Meta Mensal" current={totalMes} target={METAS.mensal} delay={160} />
-      </section>
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-3 mb-6">
+          {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
+        </div>
+      ) : (
+        <section className="grid gap-4 md:grid-cols-3 mb-6">
+          <KpiCard title="Meta Diária" current={totalDia} target={goalFor("diaria")} delay={0} />
+          <KpiCard title="Meta Semanal" current={totalSemana} target={goalFor("semanal")} delay={80} />
+          <KpiCard title="Meta Mensal" current={totalMes} target={goalFor("mensal")} delay={160} />
+        </section>
+      )}
 
       <section className="grid gap-4 lg:grid-cols-3 mb-6">
         <Card className="lg:col-span-1 animate-vm-in" style={{ animationDelay: "240ms" }}>
@@ -148,7 +164,7 @@ function Dashboard() {
 }
 
 function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
-  const pct = Math.min(100, Math.round((current / target) * 100));
+  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
     <Card className="animate-vm-in" style={{ animationDelay: `${delay}ms` }}>
       <CardHeader className="pb-2">
