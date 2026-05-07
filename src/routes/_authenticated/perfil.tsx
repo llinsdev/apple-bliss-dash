@@ -3,10 +3,14 @@ import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, Mail, Briefcase } from "lucide-react";
+import { LogOut, Mail, Briefcase, ShieldCheck, Loader2 } from "lucide-react";
 import { authApi, useAuth } from "@/lib/auth";
 import { useProfile, useIsAdmin } from "@/hooks/use-profile";
 import { toast } from "sonner";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { promoteSelfToAdmin } from "@/server/promote-admin.functions";
 
 export const Route = createFileRoute("/_authenticated/perfil")({
   component: Perfil,
