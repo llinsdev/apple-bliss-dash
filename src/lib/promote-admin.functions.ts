@@ -1,23 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 
-export const promoteSelfToAdmin = createServerFn({ method: "POST" }).handler(
-  async () => {
-    const { getRequest } = await import("@tanstack/react-start/server");
+export const promoteSelfToAdmin = createServerFn({ method: "POST" })
+  .inputValidator((data: { accessToken?: string }) => data)
+  .handler(async ({ data }) => {
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );
 
-    const request = getRequest();
-    const authHeader = request?.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      throw new Response("Unauthorized", { status: 401 });
+    if (!data.accessToken) {
+      return { ok: false, message: "Sessão não encontrada" };
     }
-    const token = authHeader.slice(7);
 
     const { data: userData, error: userErr } =
-      await supabaseAdmin.auth.getUser(token);
+      await supabaseAdmin.auth.getUser(data.accessToken);
     if (userErr || !userData?.user?.id) {
-      throw new Response("Unauthorized", { status: 401 });
+      return { ok: false, message: "Sessão inválida" };
     }
     const userId = userData.user.id;
 
@@ -32,9 +29,8 @@ export const promoteSelfToAdmin = createServerFn({ method: "POST" }).handler(
       const { error } = await supabaseAdmin
         .from("user_roles")
         .insert({ user_id: userId, role: "admin" });
-      if (error) throw new Error(error.message);
+      if (error) return { ok: false, message: error.message };
     }
 
     return { ok: true };
-  },
-);
+  });
