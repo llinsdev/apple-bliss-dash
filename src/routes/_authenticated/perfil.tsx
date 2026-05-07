@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { promoteSelfToAdmin } from "@/lib/promote-admin.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/perfil")({
   component: Perfil,
@@ -69,7 +70,9 @@ function Perfil() {
               onClick={async () => {
                 try {
                   setPromoting(true);
-                  await promote();
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const result = await promote({ data: { accessToken: sessionData.session?.access_token } });
+                  if (!result.ok) throw new Error(result.message);
                   await Promise.all([
                     queryClient.invalidateQueries({ queryKey: ["is-admin"] }),
                     queryClient.invalidateQueries({ queryKey: ["profile"] }),
