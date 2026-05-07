@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { promoteSelfToAdmin } from "@/server/promote-admin.functions";
+import { promoteSelfToAdmin } from "@/lib/promote-admin.functions";
 
 export const Route = createFileRoute("/_authenticated/perfil")({
   component: Perfil,
