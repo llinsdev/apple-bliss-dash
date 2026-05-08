@@ -59,6 +59,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <button
           onClick={async () => {
             await authApi.signOut();
+            queryClient.clear();
             navigate({ to: "/" });
           }}
           className="m-3 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"
