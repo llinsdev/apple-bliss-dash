@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { authApi } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/use-profile";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const baseItems = [
