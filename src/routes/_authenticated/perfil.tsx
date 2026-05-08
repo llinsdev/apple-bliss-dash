@@ -3,15 +3,11 @@ import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, Mail, Briefcase, ShieldCheck, Loader2 } from "lucide-react";
+import { LogOut, Mail, Briefcase } from "lucide-react";
 import { authApi, useAuth } from "@/lib/auth";
 import { useProfile, useIsAdmin } from "@/hooks/use-profile";
 import { toast } from "sonner";
-import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { promoteSelfToAdmin } from "@/lib/promote-admin.functions";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/perfil")({
   component: Perfil,
@@ -23,8 +19,6 @@ function Perfil() {
   const { data: profile } = useProfile();
   const { data: isAdmin } = useIsAdmin();
   const queryClient = useQueryClient();
-  const promote = useServerFn(promoteSelfToAdmin);
-  const [promoting, setPromoting] = useState(false);
 
   const fullName = profile?.full_name ?? user?.email?.split("@")[0] ?? "Usuário";
   const initials = fullName.split(" ").map((s: string) => s[0]).slice(0, 2).join("").toUpperCase();
@@ -56,39 +50,13 @@ function Perfil() {
             className="mt-4 w-full border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
             onClick={async () => {
               await authApi.signOut();
+              queryClient.clear();
               toast.success("Sessão encerrada");
               navigate({ to: "/" });
             }}
           >
             <LogOut className="h-4 w-4" /> Sair da conta
           </Button>
-          {!isAdmin && (
-            <Button
-              variant="ghost"
-              disabled={promoting}
-              className="w-full text-primary hover:bg-primary/10 hover:text-primary"
-              onClick={async () => {
-                try {
-                  setPromoting(true);
-                  const { data: sessionData } = await supabase.auth.getSession();
-                  const result = await promote({ data: { accessToken: sessionData.session?.access_token } });
-                  if (!result.ok) throw new Error(result.message);
-                  await Promise.all([
-                    queryClient.invalidateQueries({ queryKey: ["is-admin"] }),
-                    queryClient.invalidateQueries({ queryKey: ["profile"] }),
-                  ]);
-                  toast.success("Modo Admin ativado");
-                } catch (e: any) {
-                  toast.error(e?.message ?? "Falha ao ativar admin");
-                } finally {
-                  setPromoting(false);
-                }
-              }}
-            >
-              {promoting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              Ativar Modo Admin (Temp)
-            </Button>
-          )}
         </CardContent>
       </Card>
     </AppLayout>
