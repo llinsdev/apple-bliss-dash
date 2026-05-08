@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { authApi } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/use-profile";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const baseItems = [
@@ -16,6 +17,7 @@ const baseItems = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
 
   const items = isAdmin
@@ -57,6 +59,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <button
           onClick={async () => {
             await authApi.signOut();
+            queryClient.clear();
             navigate({ to: "/" });
           }}
           className="m-3 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"

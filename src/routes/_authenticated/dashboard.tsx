@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSales } from "@/hooks/use-sales";
 import { useMyGoals } from "@/hooks/use-goals";
+import { useAuth } from "@/lib/auth";
 import { METAS_DEFAULT, formatBRL } from "@/lib/mock-data";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -21,7 +22,12 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 type Range = "hoje" | "7" | "30";
 
 function Dashboard() {
-  const { data: vendas = [], isLoading } = useSales();
+  const { user } = useAuth();
+  const { data: allVendas = [], isLoading } = useSales();
+  const vendas = useMemo(
+    () => (user ? allVendas.filter((v) => v.seller_id === user.id) : []),
+    [allVendas, user],
+  );
   const { data: goals = [] } = useMyGoals();
   const [range, setRange] = useState<Range>("7");
 

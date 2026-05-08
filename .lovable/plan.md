@@ -1,86 +1,75 @@
-## Plano de Integração Backend — VM STORE
+# Auditoria Técnica — VM STORE MVP
 
-Conectar o frontend existente ao Lovable Cloud (Supabase) preservando 100% do design (dark mode, `#fd0241`, Inter, componentes shadcn já criados).
+## Diagnóstico (problema → impacto → solução mínima)
 
-### 1. Ativar Lovable Cloud
-Habilitar Cloud no projeto (gera `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e os clientes em `src/integrations/supabase/`).
+### CRÍTICO — bloqueia ou quebra o MVP em produção
 
-### 2. Schema (migration)
+**1. Brecha de segurança: `promoteSelfToAdmin` permite qualquer usuário virar admin**
+- Problema: `src/lib/promote-admin.functions.ts` aceita o token do próprio usuário e usa `supabaseAdmin` (service role) para inserir `role='admin'` em `user_roles` sem nenhuma checagem de autorização. Não exige nenhum claim, secret de bootstrap, allowlist de e-mail ou role pré-existente.
+- Impacto: privilege escalation total. Qualquer usuário cadastrado se promove a admin via UI ou chamando o endpoint diretamente. Em produção isso compromete metas, dados de outros vendedores e o painel `/admin`.
+- Solução mínima: assim que você for promovido, **remover** o botão em `perfil.tsx`, o arquivo `promote-admin.functions.ts` e o uso de `useServerFn` correspondente. Deixar a criação de admins apenas via SQL/migration. (Já estava combinado — só formalizando.)
 
-**Enum**
-```
-create type public.app_role as enum ('admin', 'vendedor');
-```
+**2. Não há caminho oficial para criar o 1º admin**
+- Problema: `handle_new_user` insere sempre `role='vendedor'`. A política `user_roles_admin_write` só permite escrita por quem já é admin → impossível criar o primeiro admin pelo app sem a brecha acima.
+- Impacto: depois de remover `promote-admin`, ninguém vira admin novamente.
+- Solução mínima: rodar uma migration única (`INSERT INTO user_roles(user_id, role) VALUES ('<seu uid>','admin') ON CONFLICT DO NOTHING;`) sempre que precisar promover alguém. Não exige código — só SQL.
 
-**Tabelas**
-- `profiles` — `id uuid pk references auth.users on delete cascade`, `full_name text`, `created_at timestamptz default now()`
-- `user_roles` — `id uuid pk`, `user_id uuid → auth.users`, `role app_role`, `unique(user_id, role)` *(roles separados, nunca em profiles — evita escalonamento de privilégio)*
-- `sales` — `id uuid pk`, `seller_id uuid → profiles`, `product_name text`, `category text check in ('Aparelho','Acessório')`, `sale_value numeric(12,2)`, `commission_percentage numeric(5,2)`, `commission_value numeric(12,2)`, `sale_date date default current_date`, `created_at timestamptz default now()`
-- `goals` — `id uuid pk`, `user_id uuid → profiles`, `target_value numeric`, `target_type text check in ('diaria','semanal','mensal')`, `category_focus text check in ('total','acessorios')`, `period_start date`, `period_end date`, `created_at timestamptz default now()`
+**3. Dashboard mistura "totais da loja" com dados filtrados pelo RLS**
+- Problema: `dashboard.tsx` usa `useSales()` (sem filtro por seller) e mostra "Acompanhe o progresso de metas e comissões em tempo real". Para vendedor, RLS filtra automaticamente para as próprias vendas; para admin, retorna TODAS. O texto e os KPIs (Meta Diária/Semanal/Mensal) passam a impressão de visão pessoal, mas o admin vê números agregados da loja inteira misturados com `useMyGoals` (metas do próprio admin, que normalmente não tem).
+- Impacto: admin vê KPIs incoerentes (vendas totais da loja vs. meta padrão); vendedor está OK. Risco de confusão e decisões erradas no MVP.
+- Solução mínima: no dashboard, filtrar `vendas` por `user.id` no client (ou criar `useMySales`) antes de calcular totais e gráficos. Não muda UI.
 
-**Funções e triggers**
-- `public.has_role(_user_id uuid, _role app_role) returns boolean` — `security definer`, `stable`, usada em todas as policies (evita recursão).
-- `handle_new_user()` trigger em `auth.users` — cria linha em `profiles` e atribui role `vendedor` em `user_roles` automaticamente no signup.
-- `set_commission_value()` trigger BEFORE INSERT/UPDATE em `sales` — calcula `commission_value = sale_value * commission_percentage / 100` no servidor (validação autoritativa).
+**4. Confirmação de e-mail pode estar travando signup**
+- Problema: `index.tsx` faz `navigate({ to: "/dashboard" })` logo após `authApi.signUp`. Se o projeto Lovable Cloud estiver com "Confirm email" habilitado, o `signUp` retorna sem sessão e o usuário cai no `_authenticated` → redirect de volta para `/`, sem feedback claro.
+- Impacto: usuários novos parecem "não conseguir entrar".
+- Solução mínima: verificar a config de Auth (auto-confirm para MVP interno, já que só funcionários usam) ou exibir toast "verifique seu e-mail" e não navegar quando `data.session` for `null`.
 
-### 3. RLS Policies
-Todas as tabelas com `enable row level security`.
+### IMPORTANTE — corrigir antes do lançamento, mas não bloqueante
 
-- **profiles**: SELECT → próprio registro OU `has_role(auth.uid(),'admin')`. UPDATE → próprio registro.
-- **user_roles**: SELECT → próprio OU admin. INSERT/UPDATE/DELETE → apenas admin.
-- **sales**: SELECT → `seller_id = auth.uid()` OU admin. INSERT → `seller_id = auth.uid()` OU admin. UPDATE/DELETE → próprio OU admin.
-- **goals**: SELECT → `user_id = auth.uid()` OU admin. INSERT/UPDATE/DELETE → apenas admin.
+**5. Logout não limpa cache do React Query**
+- Problema: `app-layout.tsx` e `perfil.tsx` chamam `authApi.signOut()` + `navigate('/')`, mas não invalidam `queryClient`. Cache de `is-admin`, `profile`, `sales` pode vazar para o próximo login na mesma aba.
+- Solução mínima: chamar `queryClient.clear()` no signOut (uma linha em ambos os pontos).
 
-### 4. Frontend — substituições
+**6. `useIsAdmin` re-renderiza/refetcha a cada montagem**
+- Problema: a query não tem `staleTime`. Como `AppLayout` (que usa `useIsAdmin`) está em todas as páginas autenticadas, a cada navegação o sidebar pisca o item "Admin" entrando/saindo.
+- Solução mínima: adicionar `staleTime: 60_000` em `useIsAdmin` e `useProfile`.
 
-**Auth (`src/lib/auth.ts` → reescrita)**
-- Hook `useAuth()` com `supabase.auth.onAuthStateChange` + `getSession` (listener antes de getSession).
-- Métodos `signIn`, `signUp` (cadastra como vendedor automaticamente via trigger), `signOut`.
+**7. `/admin` faz checagem dupla de role com `maybeSingle` no `beforeLoad`**
+- Problema: roda no SSR/prerender também. Hoje funciona porque `_authenticated` filtra antes, mas é frágil — se um dia mudar a ordem de loaders, quebra com 401.
+- Solução mínima: deixar a checagem só no client (ex.: redirecionar dentro do componente se `useIsAdmin().data === false`), ou mover para um layout `_authenticated/_admin.tsx` consistente com o padrão TanStack.
 
-**Login (`src/routes/index.tsx`)**
-- Adiciona toggle "Entrar / Criar conta" (mantém visual atual).
-- `signUp` usa `emailRedirectTo: window.location.origin`.
-- Toasts de erro/sucesso.
-- Dica: desabilitar "Confirm email" no Cloud para acesso imediato.
+**8. `ESC`/inconsistência de métricas com filtro de categoria**
+- Problema: `dashboard.tsx` filtra `v.category === "Aparelho"` para separar comissões. Hoje funciona porque a categoria é `"Aparelho" | "Acessório"`, mas `goals.category_focus` usa `"total" | "acessorios"` (sem cedilha). Strings diferentes para a mesma ideia → fácil divergir no futuro.
+- Solução mínima: registrar essa convenção em comentário/constante (`CATEGORIA_APARELHO`, `CATEGORIA_ACESSORIO`) — sem mudar UI.
 
-**Guard de rotas**
-- Criar `src/routes/_authenticated.tsx` (layout pathless) com `beforeLoad` que checa sessão Supabase e redireciona para `/` se ausente.
-- Mover `dashboard.tsx`, `lancamentos.tsx`, `metas.tsx`, `perfil.tsx` para `src/routes/_authenticated/` (mesmo conteúdo, novo path).
+**9. Tabela `sales` sem índice em `seller_id` e `sale_date`**
+- Problema: queries sempre filtram por `seller_id` (via RLS) e ordenam por `sale_date`. Sem índice composto, isso fica lento em poucas centenas de vendas.
+- Solução mínima: migration `CREATE INDEX sales_seller_date_idx ON sales(seller_id, sale_date DESC);`
 
-**Data layer (substitui `vendas-store.ts` mockado)**
-- `src/hooks/use-sales.ts`: `useQuery(['sales', filters])` com Supabase.
-- `src/hooks/use-goals.ts`, `src/hooks/use-profile.ts`, `src/hooks/use-is-admin.ts` (consulta `user_roles`).
-- Mutations (`useMutation`) para create/update/delete em `sales` e `goals` com `queryClient.invalidateQueries` + toasts.
-- Configurar `QueryClientProvider` no `__root.tsx` (já temos QueryClient no router).
+### FUTURO — pode esperar pós-MVP
 
-**Telas atualizadas**
-- `dashboard.tsx`: KPIs, gráficos e comissões alimentados por `useSales()` + `useGoals()`. Admin vê agregado de todos; vendedor vê só os seus (filtro automático via RLS).
-- `lancamentos.tsx`: tabela e diálogo usam mutations reais; estados de loading; toasts de erro/sucesso.
-- `metas.tsx`: leitura de `goals` reais; admin vê botão "Editar metas" abrindo dialog.
-- `perfil.tsx`: mostra `full_name`, e-mail, role; logout via `supabase.auth.signOut`.
+- Realtime: o dashboard promete "tempo real", mas não há subscription. Adicionar `supabase.channel('sales')` quando relevante.
+- Página `/reset-password` não existe — quando habilitar recuperação de senha, criar a rota pública e o fluxo `resetPasswordForEmail`.
+- `useMyGoals` retorna metas do admin também — quando admin precisar simular vendedor, criar seletor de "ver como".
+- Validar com Zod inputs de `lancamentos` e `metas` (hoje só checagem `isNaN`).
+- CHECK/trigger no banco para garantir `sale_value > 0` e `commission_percentage between 0 and 100`.
+- Soft delete de vendas (auditoria).
+- Adicionar testes de RLS (script SQL com `SET ROLE` simulando vendedor/admin).
 
-**Nova tela admin (`src/routes/_authenticated/admin.tsx`)**
-- Guard extra: `beforeLoad` checa `has_role admin`; senão redireciona para `/dashboard`.
-- Item de menu no `app-layout` visível só para admin (via `useIsAdmin`).
-- Conteúdo:
-  - Lista de vendedores (`profiles` + roles) com totais de vendas do mês.
-  - Gestão de metas: criar/editar `goals` por vendedor (dialog com target_value, target_type, category_focus, período).
-  - Filtro por vendedor reaproveitando o Dashboard/Lançamentos.
+---
 
-### 5. Detalhes técnicos
-- Usar `import { supabase } from '@/integrations/supabase/client'` em hooks/componentes.
-- `commission_value` calculado pelo trigger no banco — front envia só `sale_value` e `commission_percentage`.
-- `category` segue strings em PT-BR ("Aparelho" / "Acessório") como já no UI.
-- Datas: usar `sale_date` para filtros do dashboard (range diário/semanal/mensal).
-- Manter `mock-data.ts` apenas para constantes auxiliares (`formatBRL`, `comissaoValor` helper) — remover seed de vendas.
+## Caminho mais curto para fechar o MVP
 
-### 6. Preservação visual
-Nenhuma alteração em `styles.css`, tokens, tipografia ou componentes shadcn. Toasts via `sonner` (já instalado). Skeletons usam o componente shadcn existente para loading.
+1. **Promover seu usuário a admin via SQL** (migration única).
+2. **Remover** o botão "Ativar Modo Admin", `promote-admin.functions.ts` e import em `perfil.tsx`. Fecha a brecha #1 e #2 ao mesmo tempo.
+3. **Filtrar `useSales` por `user.id` no dashboard** (corrige #3, sem alterar UI).
+4. **Verificar config de Auth** (auto-confirm ON para o MVP interno) — corrige #4.
+5. Adicionar `queryClient.clear()` no signOut e `staleTime` em `useIsAdmin/useProfile` (#5, #6).
 
-### Entregáveis
-1. Migration SQL com enum, tabelas, função `has_role`, triggers e RLS.
-2. Reescrita de `auth.ts` + guard `_authenticated`.
-3. Hooks de dados (`use-sales`, `use-goals`, `use-profile`, `use-is-admin`).
-4. Refatoração de Login, Dashboard, Lançamentos, Metas, Perfil.
-5. Nova tela `/admin` com gestão de vendedores e metas.
-6. Atualização do `app-layout` (item Admin condicional + logout real).
+Tudo isso é texto/configuração + mudanças pequenas em 3-4 arquivos. Sem refactor, sem mudança visual, sem novas dependências.
+
+---
+
+## Próximo passo
+
+Quando aprovar este plano, eu executo na ordem 1 → 5 e devolvo um diff curto. Cada item é independente; se preferir, pulamos algum.
