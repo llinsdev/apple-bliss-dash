@@ -6,6 +6,7 @@ export function useProfile() {
   const { user } = useAuth();
   return useQuery({
     enabled: !!user,
+    staleTime: 60_000,
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -23,6 +24,7 @@ export function useIsAdmin() {
   const { user } = useAuth();
   return useQuery({
     enabled: !!user,
+    staleTime: 60_000,
     queryKey: ["is-admin", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
