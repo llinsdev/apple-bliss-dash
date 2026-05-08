@@ -17,6 +17,7 @@ const baseItems = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
 
   const items = isAdmin
