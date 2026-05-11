@@ -50,7 +50,7 @@ function Dashboard() {
   const totalMes = totalIn(startOfMonth);
 
   const comissoes = vendas.reduce((s, v) => s + Number(v.commission_value), 0);
-  const comissoesAparelhos = vendas.filter(v => v.category === "Aparelho").reduce((s, v) => s + Number(v.commission_value), 0);
+  const comissoesAparelhos = vendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAcessorios = comissoes - comissoesAparelhos;
 
   const lineData = useMemo(() => {

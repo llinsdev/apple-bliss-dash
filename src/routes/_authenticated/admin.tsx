@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,14 +27,6 @@ import { ShieldCheck, Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  beforeLoad: async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) throw redirect({ to: "/" });
-    const { data: r } = await supabase
-      .from("user_roles").select("role")
-      .eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
-    if (!r) throw redirect({ to: "/dashboard" });
-  },
   component: Admin,
 });
 
