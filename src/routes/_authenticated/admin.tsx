@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useIsAdmin } from "@/hooks/use-profile";
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,17 @@ interface ProfileRow { id: string; full_name: string | null }
 interface RoleRow { user_id: string; role: "admin" | "vendedor" }
 
 function Admin() {
+  const navigate = useNavigate();
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin === false) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [adminLoading, isAdmin, navigate]);
+
   const profilesQ = useQuery({
+    enabled: !!isAdmin,
     queryKey: ["admin", "profiles"],
     queryFn: async (): Promise<ProfileRow[]> => {
       const { data, error } = await supabase.from("profiles").select("id, full_name");
