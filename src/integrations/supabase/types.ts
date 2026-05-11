@@ -117,6 +117,63 @@ export type Database = {
           },
         ]
       }
+      sales_ingest_log: {
+        Row: {
+          created_at: string
+          erp_order_id: string
+          erp_source: string
+          error: string | null
+          id: string
+          payload: Json | null
+          sale_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          erp_order_id: string
+          erp_source?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          sale_id?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          erp_order_id?: string
+          erp_source?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          sale_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      seller_erp_map: {
+        Row: {
+          created_at: string
+          erp_seller_id: string
+          erp_source: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          erp_seller_id: string
+          erp_source?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          erp_seller_id?: string
+          erp_source?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

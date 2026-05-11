@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSales } from "@/hooks/use-sales";
 import { useMyGoals } from "@/hooks/use-goals";
 import { useAuth } from "@/lib/auth";
-import { METAS_DEFAULT, formatBRL } from "@/lib/mock-data";
+import { METAS_DEFAULT, formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
@@ -50,7 +50,7 @@ function Dashboard() {
   const totalMes = totalIn(startOfMonth);
 
   const comissoes = vendas.reduce((s, v) => s + Number(v.commission_value), 0);
-  const comissoesAparelhos = vendas.filter(v => v.category === "Aparelho").reduce((s, v) => s + Number(v.commission_value), 0);
+  const comissoesAparelhos = vendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAcessorios = comissoes - comissoesAparelhos;
 
   const lineData = useMemo(() => {

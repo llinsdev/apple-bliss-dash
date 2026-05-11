@@ -20,7 +20,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
   useSales, useCreateSale, useUpdateSale, useDeleteSale, type Sale,
 } from "@/hooks/use-sales";
-import { formatBRL, type Categoria } from "@/lib/mock-data";
+import { formatBRL, type Categoria, CATEGORIA_APARELHO, CATEGORIA_ACESSORIO } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
@@ -80,7 +80,7 @@ function Lancamentos() {
                   </TableCell>
                   <TableCell className="text-foreground">{v.product_name}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={v.category === "Aparelho" ? "border-primary/40 text-primary" : "border-border text-muted-foreground"}>
+                    <Badge variant="outline" className={v.category === CATEGORIA_APARELHO ? "border-primary/40 text-primary" : "border-border text-muted-foreground"}>
                       {v.category}
                     </Badge>
                   </TableCell>
@@ -120,7 +120,7 @@ function VendaDialog({ editing, onClose }: { editing: Sale | null; onClose: () =
   const create = useCreateSale();
   const update = useUpdateSale();
   const [produto, setProduto] = useState(editing?.product_name ?? "");
-  const [categoria, setCategoria] = useState<Categoria>(editing?.category ?? "Aparelho");
+  const [categoria, setCategoria] = useState<Categoria>(editing?.category ?? CATEGORIA_APARELHO);
   const [valor, setValor] = useState(editing ? String(editing.sale_value) : "");
   const [pct, setPct] = useState(editing ? String(editing.commission_percentage) : "");
   const [data, setData] = useState(editing?.sale_date ?? new Date().toISOString().slice(0, 10));
@@ -168,8 +168,8 @@ function VendaDialog({ editing, onClose }: { editing: Sale | null; onClose: () =
             <Select value={categoria} onValueChange={(v) => setCategoria(v as Categoria)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="Aparelho">Aparelho</SelectItem>
-                <SelectItem value="Acessório">Acessório</SelectItem>
+                <SelectItem value={CATEGORIA_APARELHO}>Aparelho</SelectItem>
+                <SelectItem value={CATEGORIA_ACESSORIO}>Acessório</SelectItem>
               </SelectContent>
             </Select>
           </div>

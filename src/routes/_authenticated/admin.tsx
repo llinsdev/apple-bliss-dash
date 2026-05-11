@@ -1,5 +1,6 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useIsAdmin } from "@/hooks/use-profile";
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,14 +28,6 @@ import { ShieldCheck, Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  beforeLoad: async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) throw redirect({ to: "/" });
-    const { data: r } = await supabase
-      .from("user_roles").select("role")
-      .eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
-    if (!r) throw redirect({ to: "/dashboard" });
-  },
   component: Admin,
 });
 
@@ -42,7 +35,17 @@ interface ProfileRow { id: string; full_name: string | null }
 interface RoleRow { user_id: string; role: "admin" | "vendedor" }
 
 function Admin() {
+  const navigate = useNavigate();
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
+
+  useEffect(() => {
+    if (!adminLoading && isAdmin === false) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [adminLoading, isAdmin, navigate]);
+
   const profilesQ = useQuery({
+    enabled: !!isAdmin,
     queryKey: ["admin", "profiles"],
     queryFn: async (): Promise<ProfileRow[]> => {
       const { data, error } = await supabase.from("profiles").select("id, full_name");
