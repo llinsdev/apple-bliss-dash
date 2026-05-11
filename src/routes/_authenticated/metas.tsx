@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useSales } from "@/hooks/use-sales";
 import { useMyGoals } from "@/hooks/use-goals";
-import { METAS_DEFAULT, formatBRL } from "@/lib/mock-data";
+import { METAS_DEFAULT, formatBRL, CATEGORIA_ACESSORIO } from "@/lib/mock-data";
 import { Trophy, Target, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/metas")({

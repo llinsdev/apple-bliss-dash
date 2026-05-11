@@ -20,7 +20,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
   useSales, useCreateSale, useUpdateSale, useDeleteSale, type Sale,
 } from "@/hooks/use-sales";
-import { formatBRL, type Categoria } from "@/lib/mock-data";
+import { formatBRL, type Categoria, CATEGORIA_APARELHO, CATEGORIA_ACESSORIO } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
