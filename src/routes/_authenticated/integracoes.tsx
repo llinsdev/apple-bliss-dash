@@ -363,5 +363,3 @@ function MappingRow({
   );
 }
 
-// silence unused var
-void userId;
