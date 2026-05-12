@@ -209,7 +209,7 @@ export async function ingestPedido(pedido: BlingPedidoDetalhe): Promise<"importe
         erp_order_id: erpOrderId,
         status: "unmapped",
         error: "Pedido sem vendedor",
-        payload: pedido as unknown as Record<string, unknown>,
+        payload: JSON.parse(JSON.stringify(pedido)),
       },
       { onConflict: "erp_source,erp_order_id" }
     );
@@ -230,7 +230,7 @@ export async function ingestPedido(pedido: BlingPedidoDetalhe): Promise<"importe
         erp_order_id: erpOrderId,
         status: "unmapped",
         error: `Vendedor Bling ${erpSellerId} não mapeado`,
-        payload: pedido as unknown as Record<string, unknown>,
+        payload: JSON.parse(JSON.stringify(pedido)),
       },
       { onConflict: "erp_source,erp_order_id" }
     );
@@ -269,7 +269,7 @@ export async function ingestPedido(pedido: BlingPedidoDetalhe): Promise<"importe
         erp_order_id: erpOrderId,
         status: "ok",
         error: null,
-        payload: pedido as unknown as Record<string, unknown>,
+        payload: JSON.parse(JSON.stringify(pedido)),
         sale_id: inserted?.[0]?.id ?? null,
       },
       { onConflict: "erp_source,erp_order_id" }
@@ -283,7 +283,7 @@ export async function ingestPedido(pedido: BlingPedidoDetalhe): Promise<"importe
         erp_order_id: erpOrderId,
         status: "error",
         error: msg,
-        payload: pedido as unknown as Record<string, unknown>,
+        payload: JSON.parse(JSON.stringify(pedido)),
       },
       { onConflict: "erp_source,erp_order_id" }
     );
