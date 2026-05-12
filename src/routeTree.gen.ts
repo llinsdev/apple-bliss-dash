@@ -16,6 +16,8 @@ import { Route as AuthenticatedMetasRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedLancamentosRouteImport } from './routes/_authenticated/lancamentos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicBlingSyncRouteImport } from './routes/api/public/bling/sync'
+import { Route as ApiPublicBlingOauthCallbackRouteImport } from './routes/api/public/bling/oauth-callback'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -52,6 +54,17 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicBlingSyncRoute = ApiPublicBlingSyncRouteImport.update({
+  id: '/api/public/bling/sync',
+  path: '/api/public/bling/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBlingOauthCallbackRoute =
+  ApiPublicBlingOauthCallbackRouteImport.update({
+    id: '/api/public/bling/oauth-callback',
+    path: '/api/public/bling/oauth-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,6 +73,8 @@ export interface FileRoutesByFullPath {
   '/lancamentos': typeof AuthenticatedLancamentosRoute
   '/metas': typeof AuthenticatedMetasRoute
   '/perfil': typeof AuthenticatedPerfilRoute
+  '/api/public/bling/oauth-callback': typeof ApiPublicBlingOauthCallbackRoute
+  '/api/public/bling/sync': typeof ApiPublicBlingSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -68,6 +83,8 @@ export interface FileRoutesByTo {
   '/lancamentos': typeof AuthenticatedLancamentosRoute
   '/metas': typeof AuthenticatedMetasRoute
   '/perfil': typeof AuthenticatedPerfilRoute
+  '/api/public/bling/oauth-callback': typeof ApiPublicBlingOauthCallbackRoute
+  '/api/public/bling/sync': typeof ApiPublicBlingSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,6 +95,8 @@ export interface FileRoutesById {
   '/_authenticated/lancamentos': typeof AuthenticatedLancamentosRoute
   '/_authenticated/metas': typeof AuthenticatedMetasRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
+  '/api/public/bling/oauth-callback': typeof ApiPublicBlingOauthCallbackRoute
+  '/api/public/bling/sync': typeof ApiPublicBlingSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,8 +107,18 @@ export interface FileRouteTypes {
     | '/lancamentos'
     | '/metas'
     | '/perfil'
+    | '/api/public/bling/oauth-callback'
+    | '/api/public/bling/sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/dashboard' | '/lancamentos' | '/metas' | '/perfil'
+  to:
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/lancamentos'
+    | '/metas'
+    | '/perfil'
+    | '/api/public/bling/oauth-callback'
+    | '/api/public/bling/sync'
   id:
     | '__root__'
     | '/'
@@ -99,11 +128,15 @@ export interface FileRouteTypes {
     | '/_authenticated/lancamentos'
     | '/_authenticated/metas'
     | '/_authenticated/perfil'
+    | '/api/public/bling/oauth-callback'
+    | '/api/public/bling/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  ApiPublicBlingOauthCallbackRoute: typeof ApiPublicBlingOauthCallbackRoute
+  ApiPublicBlingSyncRoute: typeof ApiPublicBlingSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -157,6 +190,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/bling/sync': {
+      id: '/api/public/bling/sync'
+      path: '/api/public/bling/sync'
+      fullPath: '/api/public/bling/sync'
+      preLoaderRoute: typeof ApiPublicBlingSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bling/oauth-callback': {
+      id: '/api/public/bling/oauth-callback'
+      path: '/api/public/bling/oauth-callback'
+      fullPath: '/api/public/bling/oauth-callback'
+      preLoaderRoute: typeof ApiPublicBlingOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,7 +230,19 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  ApiPublicBlingOauthCallbackRoute: ApiPublicBlingOauthCallbackRoute,
+  ApiPublicBlingSyncRoute: ApiPublicBlingSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
