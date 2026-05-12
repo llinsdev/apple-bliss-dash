@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      bling_oauth: {
+        Row: {
+          access_token: string | null
+          client_id: string | null
+          client_secret: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_synced_at: string | null
+          refresh_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          refresh_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          refresh_token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           category_focus: string
