@@ -5,10 +5,12 @@ export const Route = createFileRoute("/api/public/bling/sync")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expected = process.env.BLING_CRON_TOKEN;
-        if (!expected) return new Response("Server not configured", { status: 500 });
-        const apikey = request.headers.get("apikey") || request.headers.get("x-cron-token");
-        if (apikey !== expected) return new Response("Unauthorized", { status: 401 });
+        // Aceita o token customizado (BLING_CRON_TOKEN) ou a anon key como apikey.
+        const customToken = process.env.BLING_CRON_TOKEN;
+        const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const provided = request.headers.get("apikey") || request.headers.get("x-cron-token");
+        const ok = !!provided && (provided === customToken || provided === anonKey);
+        if (!ok) return new Response("Unauthorized", { status: 401 });
 
         try {
           const result = await runSync();
