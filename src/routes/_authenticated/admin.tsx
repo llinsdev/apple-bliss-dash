@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useIsAdmin } from "@/hooks/use-profile";
 import { AppLayout } from "@/components/app-layout";
@@ -96,6 +96,9 @@ function Admin() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Gestão de vendedores e metas.</p>
         </div>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/integracoes">Integrações</Link>
+        </Button>
       </header>
 
       <Card className="mb-6 animate-vm-in">
