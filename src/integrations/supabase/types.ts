@@ -116,6 +116,7 @@ export type Database = {
           commission_value: number
           created_at: string
           id: string
+          order_number: string | null
           product_name: string
           sale_date: string
           sale_value: number
@@ -127,6 +128,7 @@ export type Database = {
           commission_value?: number
           created_at?: string
           id?: string
+          order_number?: string | null
           product_name: string
           sale_date?: string
           sale_value: number
@@ -138,6 +140,7 @@ export type Database = {
           commission_value?: number
           created_at?: string
           id?: string
+          order_number?: string | null
           product_name?: string
           sale_date?: string
           sale_value?: number

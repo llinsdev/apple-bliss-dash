@@ -1,123 +1,63 @@
-## Reformulação — Bling API v3 (polling OAuth)
 
-A Parte 1 (índices + admin client-side + constantes de categoria) **já foi implementada** no turno anterior. Plano abaixo substitui apenas a Parte 2.
+## Objetivo
+Manter o MVP 100% manual (sem integração obrigatória com Bling), trocar o formulário de Nova Venda conforme solicitado, e preservar dashboard, metas e demais telas funcionando.
 
-### Por que mudou
-Bling API v3 = OAuth 2.0. Não é webhook. Vamos:
-1. Guardar `access_token` + `refresh_token` em uma tabela (refresh a cada ~6h)
-2. Cron `pg_cron` a cada 5 min chama nosso endpoint
-3. Endpoint consulta `/Api/v3/pedidos/vendas` filtrando por `dataAlteracaoInicial` (último sync) e `idsSituacoes` = atendido/finalizado
-4. Para cada pedido novo → mapeia vendedor (id Bling) → insere em `sales`
+## Solução mais simples possível
+A tabela `sales` atual já tem `category`, `sale_value`, `commission_percentage` e `commission_value` (calculado por trigger). O dashboard e as metas dependem desses campos por linha/categoria. Em vez de reestruturar a tabela com `device_value/accessory_value/...` (o que quebraria dashboard e metas), fazemos o seguinte:
 
----
+- O formulário aceita **um pedido** com valores opcionais de Aparelhos e Acessórios.
+- Ao salvar, gravamos **1 ou 2 linhas** em `sales` (uma por categoria preenchida), todas com o mesmo `order_number`.
+- Comissão é calculada pelo trigger existente (`sale_value * commission_percentage / 100`), passando 1% para Aparelhos e 6% para Acessórios.
 
-### A. Migrations
+Assim o resto do sistema (dashboard por categoria, metas, gráficos, lista) continua funcionando sem mudanças.
 
-**`bling_oauth` (singleton — 1 linha)**
-- `id` (sempre `'default'`, PK)
-- `client_id text`, `client_secret text` (admin cola na UI; ficam em DB com RLS só admin)
-- `access_token text`, `refresh_token text`, `expires_at timestamptz`
-- `last_synced_at timestamptz` (data do pedido mais recente já importado)
-- RLS: somente admin
+## Arquivos alterados
 
-**Estender `seller_erp_map`**
-Já criado. Vai armazenar `erp_seller_id = <id numérico do vendedor no Bling>`.
+1. **Migração SQL (mínima)**
+   - `ALTER TABLE public.sales ADD COLUMN order_number text;` (nullable, para não quebrar registros antigos).
+   - Nada mais é tocado. Estruturas Bling (`bling_oauth`, `seller_erp_map`, `sales_ingest_log`) ficam **preservadas** para uso futuro.
 
-**`sales_ingest_log`**
-Já criado. Idempotência por `erp_order_id` (id do pedido Bling).
+2. **`src/hooks/use-sales.ts`**
+   - Adicionar `order_number?: string | null` em `Sale` e `SaleInput`.
+   - Adicionar mutação `useCreateOrderSale` que recebe `{ order_number, device_value?, accessory_value? }` e insere 1 ou 2 linhas (uma por categoria com valor > 0), cada uma com `commission_percentage` correto (1 / 6) e `product_name` derivado (`"Pedido #<n> — Aparelhos"` etc., para preservar a coluna NOT NULL e a UI atual da tabela).
 
----
+3. **`src/routes/_authenticated/lancamentos.tsx`** (apenas o `VendaDialog`)
+   - Remover campo "Produto", "Categoria" e "% Comissão".
+   - Adicionar:
+     - Input "Número do pedido Bling" (texto curto, obrigatório).
+     - Bloco horizontal `[Aparelhos]` com input "Valor Aparelhos (R$)".
+     - Bloco horizontal `[Acessórios]` com input "Valor Acessórios (R$)".
+     - Resumo abaixo:
+       ```
+       Comissão Aparelhos: R$ X
+       Comissão Acessórios: R$ Y
+       Comissão Total: R$ Z
+       ```
+       calculado em tempo real (campos vazios = 0, sem NaN).
+   - Validação: pelo menos um dos dois valores precisa ser > 0.
+   - Mantém data, cores (`bg-primary` = #fd0241 atual), tipografia, estrutura de Dialog/Card. Sem fontes bold novas, sem animações novas.
+   - Tabela de listagem: opcionalmente exibir o `order_number` no lugar do produto se presente — ou manter `product_name` (que já carrega "Pedido #X — Aparelhos"). Vou manter `product_name` para não mexer na tabela e atender ao requisito "sem reorganizar páginas".
 
-### B. Secret
-- `BLING_CRON_TOKEN` — token aleatório que o endpoint exige no header `apikey` para evitar abuso (não usamos client_secret pra isso porque o endpoint é público).
+4. **`src/lib/category-rules.ts`** — não é usado fora da integração Bling. Mantido como está (não removido).
 
-> Não precisamos mais do `BLING_WEBHOOK_SECRET`. O `client_id`/`client_secret` ficam na tabela `bling_oauth` (admin cola na UI; lidos só pelo server).
+## Tabelas que precisam ajuste
+- **`sales`**: adicionar coluna `order_number text` (nullable). Apenas isso.
+- **`bling_oauth`, `seller_erp_map`, `sales_ingest_log`**: **mantidas** (sem uso ativo no fluxo).
 
----
+## Comissão (regras finais)
+- Aparelhos → 1% sobre valor de aparelhos
+- Acessórios → 6% sobre valor de acessórios
+- Total = soma das duas
+- Tudo recalculado a cada keystroke; campos vazios = 0.
 
-### C. OAuth bootstrap (uma única vez)
-Bling API v3 usa Authorization Code Flow:
-1. Admin abre `/admin/integracoes` → clica "Conectar Bling"
-2. Redireciona para `https://www.bling.com.br/Api/v3/oauth/authorize?response_type=code&client_id=...&state=...`
-3. Bling redireciona de volta para `/api/public/bling/oauth-callback?code=...&state=...`
-4. Server route troca `code` por `access_token` + `refresh_token`, salva em `bling_oauth`
+## O que NÃO será feito
+- Não mexer em sidebar, design tokens, dark mode, dashboard, metas, perfil, admin.
+- Não remover páginas/arquivos da integração Bling (ficam dormentes).
+- Não recriar tabela `sales`.
+- Não adicionar animações/fontes/cores novas.
 
-Detalhes técnicos:
-- `state` armazenado em cookie HMAC-assinado (não em sessão de DB), validado no callback
-- Header Auth na troca: `Basic base64(client_id:client_secret)`
-- `redirect_uri` cadastrada no painel Bling: `https://project--18116462-0346-45e4-ad9f-c9c3691c02ba.lovable.app/api/public/bling/oauth-callback`
-
----
-
-### D. Server functions / routes
-
-**`src/lib/bling.server.ts`** (server-only):
-- `getValidToken()` — lê `bling_oauth`; se `expires_at < now() + 5min` faz refresh via `/oauth/token` (`grant_type=refresh_token`) e atualiza row
-- `fetchSalesSince(date)` — chama `GET /Api/v3/pedidos/vendas?dataAlteracaoInicial=...&idsSituacoes[]=9` (9 = atendido) com paginação `pagina`, `limite=100`
-- `mapAndInsertSale(pedido)` — busca `seller_erp_map` por `erp_seller_id = pedido.vendedor.id`; categoriza produto; insere em `sales` via `supabaseAdmin`; grava `sales_ingest_log`
-
-**`src/lib/bling-config.functions.ts`** (server fns chamadas pela UI admin):
-- `saveBlingCredentials({ client_id, client_secret })`
-- `getBlingStatus()` → `{ connected, last_synced_at, expires_at, mapped_sellers_count }`
-- `disconnectBling()`
-- `triggerSyncNow()` — força execução do polling fora do cron
-- Todas protegidas por `requireSupabaseAuth` + check de `has_role admin`
-
-**`src/routes/api/public/bling/oauth-callback.ts`** — server route:
-- Valida `state`, troca `code` por tokens, salva, redireciona para `/admin/integracoes?ok=1`
-
-**`src/routes/api/public/bling/sync.ts`** — server route (chamado pelo cron):
-- Verifica header `apikey` contra `BLING_CRON_TOKEN`
-- Chama `fetchSalesSince(last_synced_at)` paginando
-- Para cada pedido novo, `mapAndInsertSale`
-- Atualiza `last_synced_at`
-- Retorna `{ imported, skipped_unmapped, errors }`
-
----
-
-### E. pg_cron job
-A cada 5 min chama `/api/public/bling/sync` com `apikey: BLING_CRON_TOKEN`. Pattern padrão `*/5 * * * *`.
-
----
-
-### F. UI — `/admin/integracoes`
-Nova sub-página (link no header do Admin). Conteúdo:
-
-1. **Card "Conexão Bling"**
-   - Se `!connected`: form para colar `client_id` + `client_secret` → botão "Salvar e conectar" → abre OAuth do Bling
-   - Se `connected`: badge verde + último sync + botões "Sincronizar agora" / "Desconectar"
-
-2. **Card "Mapeamento de vendedores"**
-   - Tabela com vendedores do app
-   - Para cada um: input numérico `ID do vendedor no Bling` + salvar
-   - Avisa quando um pedido cai em `unmapped_seller`
-
-3. **Card "Histórico de importação"** (`sales_ingest_log`)
-   - Últimos 50 eventos com status (ok / unmapped_seller / error)
-   - Filtro por status
-   - Erros expansíveis (mostra `error` + trecho do `payload`)
-
----
-
-### G. Categorização Aparelho/Acessório
-Regra simples no `mapAndInsertSale`:
-- Se nome do produto contém qualquer palavra de uma lista (`celular`, `smartphone`, `iphone`, `aparelho`, `motorola`, `samsung`, `xiaomi`, modelos…) → `CATEGORIA_APARELHO`
-- Senão → `CATEGORIA_ACESSORIO`
-- Lista de palavras fica em `src/lib/category-rules.ts` (frontend-safe constants) → fácil de editar depois sem mexer em server
-
----
-
-### Ordem de execução
-1. Migration `bling_oauth` (+ confirmar `seller_erp_map` e `sales_ingest_log` existentes)
-2. Pedir secret `BLING_CRON_TOKEN`
-3. `bling.server.ts` + server fns admin
-4. Route OAuth callback
-5. Route sync + agendar pg_cron
-6. UI `/admin/integracoes`
-7. Você cadastra app no Bling, cola credentials, conecta, mapeia vendedores
-8. Aguardar primeiro ciclo de 5 min e validar `sales_ingest_log`
-
-### O que você precisa preparar fora do app
-- Criar app Bling em https://developer.bling.com.br → pegar `client_id` + `client_secret`
-- Cadastrar a redirect URI: `https://project--18116462-0346-45e4-ad9f-c9c3691c02ba.lovable.app/api/public/bling/oauth-callback`
-- Anotar o id Bling de cada vendedor (vamos preencher na tela de mapeamento)
+## Ordem de execução
+1. Migração `ALTER TABLE sales ADD COLUMN order_number text` (aprovação do usuário).
+2. Atualizar `use-sales.ts` com a nova mutação.
+3. Reescrever o `VendaDialog` em `lancamentos.tsx`.
+4. Verificação visual rápida no preview.
