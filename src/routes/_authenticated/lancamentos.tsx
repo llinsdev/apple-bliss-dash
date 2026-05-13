@@ -89,9 +89,6 @@ function Lancamentos() {
                   <TableCell className="text-right text-primary">{formatBRL(Number(v.commission_value))}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEditing(v); setOpen(true); }}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="icon" variant="ghost"
                         className="h-8 w-8 text-destructive hover:text-destructive"
