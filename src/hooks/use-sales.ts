@@ -78,7 +78,12 @@ export function useCreateOrderSale() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Não autenticado");
       const sale_date = input.sale_date ?? new Date().toISOString().slice(0, 10);
-      const rows: Array<Record<string, unknown>> = [];
+      type Row = {
+        seller_id: string; product_name: string; category: Categoria;
+        sale_value: number; commission_percentage: number; commission_value: number;
+        sale_date: string; order_number: string;
+      };
+      const rows: Row[] = [];
       const dev = Number(input.device_value ?? 0);
       const acc = Number(input.accessory_value ?? 0);
       if (dev > 0) {
