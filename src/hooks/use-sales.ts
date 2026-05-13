@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Categoria } from "@/lib/mock-data";
+import { CATEGORIA_APARELHO, CATEGORIA_ACESSORIO, type Categoria } from "@/lib/mock-data";
 
 export interface Sale {
   id: string;
@@ -12,7 +12,11 @@ export interface Sale {
   commission_value: number;
   sale_date: string;
   created_at: string;
+  order_number: string | null;
 }
+
+export const APARELHO_COMISSAO_PCT = 1;
+export const ACESSORIO_COMISSAO_PCT = 6;
 
 export function useSales() {
   return useQuery({
