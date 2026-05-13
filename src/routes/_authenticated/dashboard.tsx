@@ -122,7 +122,11 @@ function Dashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
-                  formatter={(v: number) => formatBRL(v)}
+                  formatter={(v: number, name: string, item: { payload?: { name?: string } }) => {
+                    const idx = pieData.findIndex(d => d.name === (item?.payload?.name ?? name));
+                    const color = PIE_COLORS[idx] ?? "var(--foreground)";
+                    return [<span style={{ color }}>{formatBRL(v)}</span>, <span style={{ color }}>{name}</span>];
+                  }}
                 />
                 <Legend />
               </PieChart>
