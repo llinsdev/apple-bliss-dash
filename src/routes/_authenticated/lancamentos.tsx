@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2 } from "lucide-react";
 import {
-  useSales, useCreateOrderSale, useDeleteSale, type Sale,
+  useSales, useCreateOrderSale, useDeleteSale,
   APARELHO_COMISSAO_PCT, ACESSORIO_COMISSAO_PCT,
 } from "@/hooks/use-sales";
 import { formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
