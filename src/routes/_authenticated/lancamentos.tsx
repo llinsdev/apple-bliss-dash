@@ -18,9 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
-  useSales, useCreateSale, useUpdateSale, useDeleteSale, type Sale,
+  useSales, useCreateOrderSale, useDeleteSale, type Sale,
+  APARELHO_COMISSAO_PCT, ACESSORIO_COMISSAO_PCT,
 } from "@/hooks/use-sales";
-import { formatBRL, type Categoria, CATEGORIA_APARELHO, CATEGORIA_ACESSORIO } from "@/lib/mock-data";
+import { formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
