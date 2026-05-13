@@ -32,7 +32,6 @@ function Lancamentos() {
   const { data: vendas = [], isLoading } = useSales();
   const del = useDeleteSale();
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Sale | null>(null);
 
   return (
     <AppLayout>
@@ -41,13 +40,13 @@ function Lancamentos() {
           <h1 className="text-2xl md:text-3xl text-foreground">Lançamentos</h1>
           <p className="text-sm text-muted-foreground mt-1">Histórico de vendas e comissões.</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditing(null); }}>
+        <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Plus className="h-4 w-4" /> Adicionar venda
             </Button>
           </DialogTrigger>
-          <VendaDialog editing={editing} onClose={() => { setOpen(false); setEditing(null); }} />
+          <VendaDialog onClose={() => setOpen(false)} />
         </Dialog>
       </header>
 
