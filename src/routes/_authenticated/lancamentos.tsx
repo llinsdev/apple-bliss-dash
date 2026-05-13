@@ -113,82 +113,101 @@ function Lancamentos() {
   );
 }
 
-function VendaDialog({ editing, onClose }: { editing: Sale | null; onClose: () => void }) {
-  const create = useCreateSale();
-  const update = useUpdateSale();
-  const [produto, setProduto] = useState(editing?.product_name ?? "");
-  const [categoria, setCategoria] = useState<Categoria>(editing?.category ?? CATEGORIA_APARELHO);
-  const [valor, setValor] = useState(editing ? String(editing.sale_value) : "");
-  const [pct, setPct] = useState(editing ? String(editing.commission_percentage) : "");
-  const [data, setData] = useState(editing?.sale_date ?? new Date().toISOString().slice(0, 10));
+function VendaDialog({ onClose }: { onClose: () => void }) {
+  const create = useCreateOrderSale();
+  const [orderNumber, setOrderNumber] = useState("");
+  const [aparelhos, setAparelhos] = useState("");
+  const [acessorios, setAcessorios] = useState("");
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
 
-  const busy = create.isPending || update.isPending;
+  const aparelhosNum = Number.parseFloat(aparelhos) || 0;
+  const acessoriosNum = Number.parseFloat(acessorios) || 0;
+  const comissaoAparelhos = aparelhosNum * (APARELHO_COMISSAO_PCT / 100);
+  const comissaoAcessorios = acessoriosNum * (ACESSORIO_COMISSAO_PCT / 100);
+  const comissaoTotal = comissaoAparelhos + comissaoAcessorios;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const v = parseFloat(valor);
-    const p = parseFloat(pct);
-    if (!produto || isNaN(v) || isNaN(p)) return;
-    const payload = {
-      product_name: produto,
-      category: categoria,
-      sale_value: v,
-      commission_percentage: p,
-      sale_date: data,
-    };
-    if (editing) {
-      update.mutate({ id: editing.id, patch: payload }, {
-        onSuccess: () => { toast.success("Venda atualizada"); onClose(); },
-        onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar"),
-      });
-    } else {
-      create.mutate(payload, {
-        onSuccess: () => { toast.success("Venda registrada"); onClose(); },
-        onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar"),
-      });
+    if (!orderNumber.trim()) return;
+    if (aparelhosNum <= 0 && acessoriosNum <= 0) {
+      toast.error("Informe o valor de aparelhos e/ou acessórios");
+      return;
     }
+    create.mutate(
+      {
+        order_number: orderNumber.trim(),
+        device_value: aparelhosNum,
+        accessory_value: acessoriosNum,
+        sale_date: data,
+      },
+      {
+        onSuccess: () => { toast.success("Venda registrada"); onClose(); },
+        onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao salvar"),
+      },
+    );
   };
 
   return (
     <DialogContent className="bg-card border-border">
       <DialogHeader>
-        <DialogTitle className="text-foreground">{editing ? "Editar venda" : "Nova venda"}</DialogTitle>
+        <DialogTitle className="text-foreground">Nova venda</DialogTitle>
       </DialogHeader>
       <form onSubmit={submit} className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-muted-foreground">Produto</Label>
-          <Input value={produto} onChange={(e) => setProduto(e.target.value)} placeholder="Ex: iPhone 15 Pro" required />
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label className="text-muted-foreground">Categoria</Label>
-            <Select value={categoria} onValueChange={(v) => setCategoria(v as Categoria)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={CATEGORIA_APARELHO}>Aparelho</SelectItem>
-                <SelectItem value={CATEGORIA_ACESSORIO}>Acessório</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label className="text-muted-foreground">Número do pedido Bling</Label>
+            <Input
+              value={orderNumber}
+              onChange={(e) => setOrderNumber(e.target.value)}
+              placeholder="Ex: 123456"
+              maxLength={64}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label className="text-muted-foreground">Data</Label>
             <Input type="date" value={data} onChange={(e) => setData(e.target.value)} required />
           </div>
         </div>
+
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label className="text-muted-foreground">Valor (R$)</Label>
-            <Input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} required />
+          <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-2">
+            <Label className="text-muted-foreground">Aparelhos</Label>
+            <Input
+              type="number" step="0.01" min="0" inputMode="decimal"
+              value={aparelhos} onChange={(e) => setAparelhos(e.target.value)}
+              placeholder="R$ 0,00"
+            />
           </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground">% Comissão</Label>
-            <Input type="number" step="0.1" value={pct} onChange={(e) => setPct(e.target.value)} required />
+          <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-2">
+            <Label className="text-muted-foreground">Acessórios</Label>
+            <Input
+              type="number" step="0.01" min="0" inputMode="decimal"
+              value={acessorios} onChange={(e) => setAcessorios(e.target.value)}
+              placeholder="R$ 0,00"
+            />
           </div>
         </div>
+
+        <div className="rounded-lg border border-border p-3 space-y-1 text-sm">
+          <div className="flex justify-between text-muted-foreground">
+            <span>Comissão Aparelhos ({APARELHO_COMISSAO_PCT}%)</span>
+            <span className="text-foreground">{formatBRL(comissaoAparelhos)}</span>
+          </div>
+          <div className="flex justify-between text-muted-foreground">
+            <span>Comissão Acessórios ({ACESSORIO_COMISSAO_PCT}%)</span>
+            <span className="text-foreground">{formatBRL(comissaoAcessorios)}</span>
+          </div>
+          <div className="flex justify-between border-t border-border pt-2 mt-2">
+            <span className="text-muted-foreground">Comissão Total</span>
+            <span className="text-primary">{formatBRL(comissaoTotal)}</span>
+          </div>
+        </div>
+
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" disabled={busy} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            {busy ? "Salvando..." : editing ? "Salvar" : "Registrar"}
+          <Button type="submit" disabled={create.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            {create.isPending ? "Salvando..." : "Registrar"}
           </Button>
         </DialogFooter>
       </form>
