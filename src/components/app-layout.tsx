@@ -1,7 +1,8 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, ListPlus, Target, User, LogOut, Store, ShieldCheck,
+  LayoutDashboard, ListPlus, Target, User, LogOut, ShieldCheck,
 } from "lucide-react";
+import vmLogo from "@/assets/vm-logo.png";
 import { authApi } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/use-profile";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,8 +29,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen w-full bg-background text-foreground">
       <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar">
         <div className="flex items-center gap-3 px-6 py-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <Store className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15">
+            <img src={vmLogo} alt="VM STORE" className="h-6 w-6 object-contain" />
           </div>
           <div className="leading-tight">
             <div className="text-sm tracking-wide text-foreground">VM STORE</div>
