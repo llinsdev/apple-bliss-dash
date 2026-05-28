@@ -90,23 +90,7 @@ function Dashboard() {
           {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
         </div>
       ) : isAdmin ? (
-        <div className="grid gap-6 xl:grid-cols-2">
-          {sellers.map((s) => (
-            <div key={s.id} className="space-y-4 min-w-0">
-              <div className="text-sm text-muted-foreground border-l-2 border-primary pl-3 truncate">
-                {s.full_name ?? "—"}
-              </div>
-              <SellerDashboardView
-                sellerId={s.id}
-                sales={allVendas}
-                goals={allGoals.filter(g => g.user_id === s.id)}
-              />
-            </div>
-          ))}
-          {sellers.length === 0 && (
-            <div className="text-sm text-muted-foreground">Nenhum vendedor encontrado.</div>
-          )}
-        </div>
+        <AdminSellerSwitcher sellers={sellers} sales={allVendas} allGoals={allGoals} />
       ) : user ? (
         <SellerDashboardView
           sellerId={user.id}
@@ -115,6 +99,57 @@ function Dashboard() {
         />
       ) : null}
     </AppLayout>
+  );
+}
+
+function AdminSellerSwitcher({
+  sellers,
+  sales,
+  allGoals,
+}: {
+  sellers: ProfileRow[];
+  sales: Sale[];
+  allGoals: Goal[];
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const activeId = selectedId ?? sellers[0]?.id ?? null;
+  const activeGoals = useMemo(
+    () => (activeId ? allGoals.filter((g) => g.user_id === activeId) : []),
+    [allGoals, activeId],
+  );
+
+  if (sellers.length === 0) {
+    return <div className="text-sm text-muted-foreground">Nenhum vendedor encontrado.</div>;
+  }
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-4 flex flex-wrap gap-2 rounded-lg bg-secondary p-1 w-fit">
+        {sellers.map((s) => (
+          <Button
+            key={s.id}
+            variant={activeId === s.id ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedId(s.id)}
+            className={
+              activeId === s.id
+                ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8"
+                : "h-8 text-muted-foreground hover:text-foreground"
+            }
+          >
+            {s.full_name ?? "—"}
+          </Button>
+        ))}
+      </div>
+      {activeId && (
+        <SellerDashboardView
+          key={activeId}
+          sellerId={activeId}
+          sales={sales}
+          goals={activeGoals}
+        />
+      )}
+    </div>
   );
 }
 
