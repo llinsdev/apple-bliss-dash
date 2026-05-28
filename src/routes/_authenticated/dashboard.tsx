@@ -1,19 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSales } from "@/hooks/use-sales";
-import { useMyGoals } from "@/hooks/use-goals";
+import { useMyGoals, useAllGoals } from "@/hooks/use-goals";
 import { useAuth } from "@/lib/auth";
+import { useIsAdmin } from "@/hooks/use-profile";
+import { supabase } from "@/integrations/supabase/client";
 import { METAS_DEFAULT, formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { TrendingUp, Wallet, Smartphone, Headphones } from "lucide-react";
+import { TrendingUp, Wallet, Smartphone, Headphones, Users } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
