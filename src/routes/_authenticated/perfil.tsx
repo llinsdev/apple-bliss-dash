@@ -1,11 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, Mail, Briefcase } from "lucide-react";
 import { authApi, useAuth } from "@/lib/auth";
 import { useProfile, useIsAdmin } from "@/hooks/use-profile";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -22,6 +26,29 @@ function Perfil() {
 
   const fullName = profile?.full_name ?? user?.email?.split("@")[0] ?? "Usuário";
   const initials = fullName.split(" ").map((s: string) => s[0]).slice(0, 2).join("").toUpperCase();
+
+  const [nome, setNome] = useState(fullName);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setNome(fullName);
+  }, [fullName]);
+
+  const salvarNome = async () => {
+    if (!user || !nome.trim() || nome.trim() === fullName) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: nome.trim() })
+      .eq("id", user.id);
+    setSaving(false);
+    if (error) {
+      toast.error("Erro ao salvar nome");
+      return;
+    }
+    await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+    toast.success("Nome atualizado");
+  };
 
   return (
     <AppLayout>
@@ -43,6 +70,25 @@ function Perfil() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <Label htmlFor="nome" className="text-muted-foreground text-xs">Nome de exibição</Label>
+            <div className="flex gap-2">
+              <Input
+                id="nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="h-9 bg-input border-border"
+                placeholder="Seu nome"
+              />
+              <Button
+                onClick={salvarNome}
+                disabled={saving || !nome.trim() || nome.trim() === fullName}
+                className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </div>
           <Row icon={<Mail className="h-4 w-4" />} label="E-mail" value={user?.email ?? "—"} />
           <Row icon={<Briefcase className="h-4 w-4" />} label="Cargo" value={isAdmin ? "Admin" : "Vendedor"} />
           <Button

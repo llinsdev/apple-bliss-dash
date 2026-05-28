@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Store, Mail, Lock, User as UserIcon } from "lucide-react";
+import { Mail, Lock, User as UserIcon } from "lucide-react";
+import vmLogo from "@/assets/vm-logo.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -53,9 +54,7 @@ function LoginPage() {
       />
       <div className="relative w-full max-w-md animate-vm-in">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-            <Store className="h-7 w-7" />
-          </div>
+          <img src={vmLogo} alt="VM STORE" className="h-16 w-16 object-contain" />
           <div className="text-center">
             <h1 className="text-2xl text-foreground">VM STORE</h1>
             <p className="text-sm text-muted-foreground">Gestão de metas e comissões</p>
