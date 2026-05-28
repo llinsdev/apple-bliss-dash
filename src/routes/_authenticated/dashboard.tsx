@@ -264,11 +264,8 @@ function SellerDashboardView({
   );
 }
 
-  );
-}
+function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
 
-function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
-function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
     <Card className="animate-vm-in min-w-0 overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
