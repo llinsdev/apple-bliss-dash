@@ -86,6 +86,9 @@ function Dashboard() {
         <p className="text-sm text-muted-foreground mt-1">Acompanhe o progresso de metas e comissões em tempo real.</p>
       </header>
 
+      <AdminSellersPanel />
+
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-3 mb-6">
           {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
