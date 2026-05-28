@@ -22,6 +22,18 @@ import { Plug, RefreshCw, Trash2, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/integracoes")({
+  beforeLoad: async () => {
+    const { redirect } = await import("@tanstack/react-router");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/" });
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!data) throw redirect({ to: "/dashboard" });
+  },
   component: Integracoes,
   validateSearch: (s: Record<string, unknown>) => ({ ok: s.ok === "1" ? "1" : undefined }),
 });
