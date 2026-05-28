@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Store, Mail, Lock, User as UserIcon } from "lucide-react";
+import { Mail, Lock, User as UserIcon } from "lucide-react";
+import vmLogo from "@/assets/vm-logo.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
