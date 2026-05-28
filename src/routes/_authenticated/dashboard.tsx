@@ -207,3 +207,98 @@ function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string
     </div>
   );
 }
+
+interface ProfileRow { id: string; full_name: string | null }
+
+function AdminSellersPanel() {
+  const { data: isAdmin } = useIsAdmin();
+  const qc = useQueryClient();
+  const { data: sales = [] } = useSales();
+  const { data: goals = [] } = useAllGoals();
+  const profilesQ = useQuery({
+    enabled: !!isAdmin,
+    queryKey: ["admin", "profiles"],
+    queryFn: async (): Promise<ProfileRow[]> => {
+      const { data, error } = await supabase.from("profiles").select("id, full_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const channel = supabase
+      .channel("sales-admin-dashboard")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => {
+        qc.invalidateQueries({ queryKey: ["sales"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isAdmin, qc]);
+
+  const startMonth = useMemo(() => {
+    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1);
+  }, []);
+
+  const rows = useMemo(() => {
+    if (!isAdmin) return [];
+    const profiles = profilesQ.data ?? [];
+    return profiles.map((p) => {
+      const mySales = sales.filter((s) => s.seller_id === p.id);
+      const monthSales = mySales.filter((s) => new Date(s.sale_date) >= startMonth);
+      const total = monthSales.reduce((acc, s) => acc + Number(s.sale_value), 0);
+      const comissao = monthSales.reduce((acc, s) => acc + Number(s.commission_value), 0);
+      const myGoals = goals.filter((g) => g.user_id === p.id);
+      const goalsHit = myGoals.filter((g) => {
+        const start = new Date(g.period_start);
+        const end = new Date(g.period_end); end.setHours(23, 59, 59, 999);
+        const inRange = mySales.filter((s) => {
+          const d = new Date(s.sale_date); return d >= start && d <= end;
+        });
+        const value = g.category_focus === "acessorios"
+          ? inRange.filter((s) => s.category !== CATEGORIA_APARELHO).reduce((a, s) => a + Number(s.sale_value), 0)
+          : inRange.reduce((a, s) => a + Number(s.sale_value), 0);
+        return value >= Number(g.target_value);
+      }).length;
+      return { id: p.id, name: p.full_name ?? "—", total, comissao, goalsHit, goalsTotal: myGoals.length };
+    }).sort((a, b) => b.total - a.total);
+  }, [isAdmin, profilesQ.data, sales, goals, startMonth]);
+
+  if (!isAdmin) return null;
+
+  return (
+    <section className="mb-8 animate-vm-in">
+      <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <Users className="h-4 w-4 text-primary" />
+        Vendedores (mês atual) — atualização em tempo real
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map((r) => (
+          <Card key={r.id}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-foreground">{r.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">Total vendido</span>
+                <span className="text-base text-foreground">{formatBRL(r.total)}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">Comissão</span>
+                <span className="text-sm text-primary">{formatBRL(r.comissao)}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">Metas atingidas</span>
+                <span className="text-sm text-foreground">{r.goalsHit}/{r.goalsTotal}</span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        {rows.length === 0 && (
+          <div className="text-sm text-muted-foreground">Nenhum vendedor encontrado.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
