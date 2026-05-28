@@ -19,9 +19,10 @@ export const Route = createFileRoute("/api/public/bling/oauth-callback")({
         try {
           await exchangeCodeForToken(code);
         } catch (e) {
-          const msg = e instanceof Error ? e.message : "Erro";
-          return new Response(`Falha ao trocar code: ${msg}`, { status: 500 });
+          console.error("[bling/oauth-callback] erro", e);
+          return new Response("OAuth token exchange failed. Contact your administrator.", { status: 500 });
         }
+
 
         return new Response(null, {
           status: 302,
