@@ -1,23 +1,33 @@
-Ajustes simples no VM STORE: edição de nome no Perfil, logo sem container na sidebar e logo na tela de login.
+## Objetivo
+Mostrar no Dashboard, apenas para ADMIN, uma seção com cards lado a lado de cada vendedor (nome, total vendido no mês, comissão total, metas atingidas), atualizando em tempo real via Supabase Realtime. Vendedor comum continua vendo apenas o próprio dashboard atual.
 
-## Ajuste 1 — Edição do nome no Perfil
-- Em `src/routes/_authenticated/perfil.tsx`, adicionar estado local com `useState` para editar `full_name`.
-- Incluir input inline abaixo do nome atual e botão "Salvar".
-- Ao salvar, chamar `supabase.from('profiles').update({ full_name })` e invalidar cache do React Query para refletir em todo o sistema.
-- Apenas o próprio usuário pode alterar seu nome; admin já tem controle total via RLS existente.
+## Componentes alterados
+- `src/routes/_authenticated/dashboard.tsx` — única alteração de UI. Adicionar, condicionalmente quando `useIsAdmin()` for `true`, uma nova `<section>` no topo (ou final) com grid de cards `SellerCard` reaproveitando `Card`/`CardHeader`/`CardContent` e `Progress` já existentes. Não muda layout do dashboard pessoal — apenas anexa um bloco extra para admin.
 
-## Ajuste 2 — Logotipo sem fundo na sidebar
-- Em `src/components/app-layout.tsx`, remover o wrapper `<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15">` atrás do logo.
-- Manter apenas o `<img src={vmLogo}>` com alinhamento flex do container pai.
-- Preservar tamanho geral da navbar/sidebar e espaçamentos existentes.
+## Dados
+- Reutilizar hooks existentes:
+  - `useSales()` — já retorna **todas** as vendas (RLS já permite admin ler tudo).
+  - `useAllGoals()` (de `src/hooks/use-goals.ts`, já usado em `/admin`).
+  - Query nova mínima inline: `profiles (id, full_name)` — mesma usada na página admin.
+- Agregar no client (em `useMemo`): agrupar `sales` por `seller_id` no mês corrente → total vendido, comissão total, e contagem de metas atingidas (comparando soma do vendedor no período da meta com `target_value`).
+- Nada de queries novas pesadas — todos os dados já estão (ou podem ser) carregados via React Query com cache.
 
-## Ajuste 3 — Logotipo na tela de login
-- Em `src/routes/index.tsx`, substituir o ícone `<Store className="h-7 w-7" />` dentro do quadrado vermelho por `<img src={vmLogo} alt="VM STORE" className="h-10 w-auto" />`.
-- Remover o container quadrado (`rounded-2xl bg-primary text-primary-foreground shadow-lg`) ou adaptá-lo para conter a imagem de forma clean, sem fundo adicional.
-- Manter centralização e estrutura do formulário intacta.
+## Tempo real
+- Já existe `useSales` com React Query. Adicionar um `useEffect` (dentro do bloco admin) que assina o canal Supabase Realtime na tabela `sales` e invalida a query `["sales"]`:
+  ```ts
+  supabase.channel('sales-admin')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' },
+        () => qc.invalidateQueries({ queryKey: ['sales'] }))
+    .subscribe()
+  ```
+- Requer migration única: `ALTER PUBLICATION supabase_realtime ADD TABLE public.sales;` (e `REPLICA IDENTITY FULL` para garantir payload completo, embora não seja usado aqui).
+- Sem polling. Sem novos componentes pesados.
 
-## Tabelas afetadas
-- `profiles` — apenas UPDATE no campo `full_name`. Nenhuma tabela nova.
+## Segurança
+- Bloco só renderiza se `useIsAdmin()` retornar true. RLS de `sales` já permite admin ler tudo (`has_role(auth.uid(),'admin')`), então vendedor comum nem recebe os dados extras.
 
-## Nota
-Nenhum layout novo, nenhuma refatoração, nenhuma alteração visual além dos três pontos acima.
+## Solução mais simples
+1. Migration: habilitar realtime na tabela `sales`.
+2. Editar `dashboard.tsx`: adicionar `useIsAdmin`, `useAllGoals`, query de profiles, efeito de realtime, e uma seção `{isAdmin && <AdminSellersPanel />}` com grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` de cards mínimos.
+
+Sem novos arquivos, sem refator, sem mudança visual no resto da página.
