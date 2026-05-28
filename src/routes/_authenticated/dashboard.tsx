@@ -90,10 +90,10 @@ function Dashboard() {
           {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
         </div>
       ) : isAdmin ? (
-        <div className="grid gap-8 xl:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2">
           {sellers.map((s) => (
-            <div key={s.id} className="space-y-6">
-              <div className="text-sm text-muted-foreground border-l-2 border-primary pl-3">
+            <div key={s.id} className="space-y-4 min-w-0">
+              <div className="text-sm text-muted-foreground border-l-2 border-primary pl-3 truncate">
                 {s.full_name ?? "—"}
               </div>
               <SellerDashboardView
@@ -178,37 +178,37 @@ function SellerDashboardView({
   const PIE_COLORS = ["var(--primary)", "var(--chart-2)"];
 
   return (
-    <>
-      <section className="grid gap-4 md:grid-cols-3 mb-6">
+    <div className="min-w-0">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-4">
         <KpiCard title="Meta Diária" current={totalDia} target={goalFor("diaria")} delay={0} />
         <KpiCard title="Meta Semanal" current={totalSemana} target={goalFor("semanal")} delay={80} />
         <KpiCard title="Meta Mensal" current={totalMes} target={goalFor("mensal")} delay={160} />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3 mb-6">
-        <Card className="lg:col-span-1 animate-vm-in" style={{ animationDelay: "240ms" }}>
+      <section className="grid gap-3 lg:grid-cols-3 mb-4">
+        <Card className="lg:col-span-1 animate-vm-in min-w-0" style={{ animationDelay: "240ms" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" /> Comissões Acumuladas
+              <Wallet className="h-4 w-4 text-primary shrink-0" /> <span className="truncate">Comissões Acumuladas</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl text-foreground">{formatBRL(comissoes)}</div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="text-2xl text-foreground truncate">{formatBRL(comissoes)}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <MiniStat icon={<Smartphone className="h-4 w-4" />} label="Aparelhos" value={formatBRL(comissoesAparelhos)} />
               <MiniStat icon={<Headphones className="h-4 w-4" />} label="Acessórios" value={formatBRL(comissoesAcessorios)} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 animate-vm-in" style={{ animationDelay: "320ms" }}>
+        <Card className="lg:col-span-2 animate-vm-in min-w-0" style={{ animationDelay: "320ms" }}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Comissões por categoria</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground truncate">Comissões por categoria</CardTitle>
           </CardHeader>
-          <CardContent className="h-[260px]">
+          <CardContent className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95} stroke="none">
+              <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={42} outerRadius={70} stroke="none">
                   {pieData.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i]} />))}
                 </Pie>
                 <Tooltip
@@ -219,19 +219,19 @@ function SellerDashboardView({
                     return [<span style={{ color }}>{formatBRL(v)}</span>, <span style={{ color }}>{name}</span>];
                   }}
                 />
-                <Legend />
+                <Legend verticalAlign="bottom" height={24} wrapperStyle={{ fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </section>
 
-      <Card className="animate-vm-in" style={{ animationDelay: "400ms" }}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" /> Vendas no período
+      <Card className="animate-vm-in min-w-0" style={{ animationDelay: "400ms" }}>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardTitle className="text-sm text-muted-foreground flex items-center gap-2 min-w-0">
+            <TrendingUp className="h-4 w-4 text-primary shrink-0" /> <span className="truncate">Vendas no período</span>
           </CardTitle>
-          <div className="flex gap-1 rounded-lg bg-secondary p-1">
+          <div className="flex gap-1 rounded-lg bg-secondary p-1 shrink-0">
             {(["hoje","7","30"] as const).map(r => (
               <Button
                 key={r}
@@ -245,12 +245,12 @@ function SellerDashboardView({
             ))}
           </div>
         </CardHeader>
-        <CardContent className="h-[300px]">
+        <CardContent className="h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={lineData} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-              <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} width={48} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
                 formatter={(v: number) => formatBRL(v)}
@@ -260,21 +260,22 @@ function SellerDashboardView({
           </ResponsiveContainer>
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }
 
 function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
+
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
-    <Card className="animate-vm-in" style={{ animationDelay: `${delay}ms` }}>
+    <Card className="animate-vm-in min-w-0 overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm text-muted-foreground truncate">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-baseline justify-between">
-          <span className="text-2xl text-foreground">{formatBRL(current)}</span>
-          <span className="text-xs text-muted-foreground">/ {formatBRL(target)}</span>
+        <div className="flex items-baseline justify-between gap-2 min-w-0">
+          <span className="text-xl text-foreground truncate">{formatBRL(current)}</span>
+          <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">/ {formatBRL(target)}</span>
         </div>
         <Progress value={pct} className="mt-3 h-2" />
         <div className="mt-2 text-xs text-primary">{pct}% atingido</div>
@@ -282,6 +283,7 @@ function KpiCard({ title, current, target, delay }: { title: string; current: nu
     </Card>
   );
 }
+
 
 function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
