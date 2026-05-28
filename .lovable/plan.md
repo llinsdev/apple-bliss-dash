@@ -1,33 +1,43 @@
-## Objetivo
-Mostrar no Dashboard, apenas para ADMIN, uma seção com cards lado a lado de cada vendedor (nome, total vendido no mês, comissão total, metas atingidas), atualizando em tempo real via Supabase Realtime. Vendedor comum continua vendo apenas o próprio dashboard atual.
+## Correção do Dashboard ADMIN — mesmo visual do vendedor, lado a lado
 
-## Componentes alterados
-- `src/routes/_authenticated/dashboard.tsx` — única alteração de UI. Adicionar, condicionalmente quando `useIsAdmin()` for `true`, uma nova `<section>` no topo (ou final) com grid de cards `SellerCard` reaproveitando `Card`/`CardHeader`/`CardContent` e `Progress` já existentes. Não muda layout do dashboard pessoal — apenas anexa um bloco extra para admin.
+### O que muda
+Apenas `src/routes/_authenticated/dashboard.tsx`. Sem migrations, sem novos componentes de UI, sem novos hooks, sem alterar sidebar/tema.
 
-## Dados
-- Reutilizar hooks existentes:
-  - `useSales()` — já retorna **todas** as vendas (RLS já permite admin ler tudo).
-  - `useAllGoals()` (de `src/hooks/use-goals.ts`, já usado em `/admin`).
-  - Query nova mínima inline: `profiles (id, full_name)` — mesma usada na página admin.
-- Agregar no client (em `useMemo`): agrupar `sales` por `seller_id` no mês corrente → total vendido, comissão total, e contagem de metas atingidas (comparando soma do vendedor no período da meta com `target_value`).
-- Nada de queries novas pesadas — todos os dados já estão (ou podem ser) carregados via React Query com cache.
+### Componentes reutilizados (já existem no arquivo)
+- `KpiCard` (Meta Diária / Semanal / Mensal)
+- `MiniStat` (comissões aparelhos/acessórios)
+- Card de "Comissões Acumuladas" + `PieChart` de categorias
+- `LineChart` de "Vendas no período" com seletor Hoje/7/30
+- Hooks já em uso: `useSales`, `useAllGoals`, `useIsAdmin`, `supabase` realtime
 
-## Tempo real
-- Já existe `useSales` com React Query. Adicionar um `useEffect` (dentro do bloco admin) que assina o canal Supabase Realtime na tabela `sales` e invalida a query `["sales"]`:
-  ```ts
-  supabase.channel('sales-admin')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' },
-        () => qc.invalidateQueries({ queryKey: ['sales'] }))
-    .subscribe()
-  ```
-- Requer migration única: `ALTER PUBLICATION supabase_realtime ADD TABLE public.sales;` (e `REPLICA IDENTITY FULL` para garantir payload completo, embora não seja usado aqui).
-- Sem polling. Sem novos componentes pesados.
+### Refatoração mínima (sem duplicar lógica)
+1. Extrair o conteúdo atual do `Dashboard` (KPIs + comissões + pie + line) em um componente local `SellerDashboardView({ sellerId, sellerName, sales, goals })` dentro do mesmo arquivo.
+   - Toda a lógica de `totalDia/Semana/Mes`, `goalFor`, `lineData`, `pieData` passa a viver dentro dele, parametrizada por `sellerId`.
+2. O `Dashboard` (vendedor) passa a renderizar `<SellerDashboardView sellerId={user.id} sellerName="Meu painel" sales={allVendas} goals={myGoals} />` — mesmo visual de hoje, zero mudança perceptível.
+3. Para o admin, substituir o atual `AdminSellersPanel` (cards resumidos) por um grid `grid-cols-1 xl:grid-cols-2` que renderiza um `SellerDashboardView` por vendedor, lado a lado.
 
-## Segurança
-- Bloco só renderiza se `useIsAdmin()` retornar true. RLS de `sales` já permite admin ler tudo (`has_role(auth.uid(),'admin')`), então vendedor comum nem recebe os dados extras.
+### Como separar Mariano × Dominique e excluir Leandro
+- Buscar perfis + roles via Supabase: `profiles` join lógico com `user_roles` (query separada de `user_roles` já cacheada).
+- Filtro: incluir apenas perfis cujo `user_id` **não** tenha role `admin`. Isso exclui Leandro automaticamente (sem hard-code de nome), garantindo robustez se houver troca de admin.
+- Ordenar alfabeticamente para layout estável (Dominique, Mariano).
+- Cada vendedor recebe seu subconjunto de `sales` (filtrado por `seller_id`) e `goals` (filtrado por `user_id`) — uma única query global de `sales`/`goals`, sem N+1.
 
-## Solução mais simples
-1. Migration: habilitar realtime na tabela `sales`.
-2. Editar `dashboard.tsx`: adicionar `useIsAdmin`, `useAllGoals`, query de profiles, efeito de realtime, e uma seção `{isAdmin && <AdminSellersPanel />}` com grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` de cards mínimos.
+### Tempo real
+Mantém o `supabase.channel("sales-admin-dashboard")` já implementado, com `invalidateQueries(['sales'])`. Como cada `SellerDashboardView` deriva de `allVendas` via `useMemo`, todos atualizam automaticamente em nova venda.
 
-Sem novos arquivos, sem refator, sem mudança visual no resto da página.
+### Modo admin vs vendedor (mesma rota)
+```
+if (isAdmin) {
+  // header + grid xl:grid-cols-2 de SellerDashboardView (Mariano, Dominique)
+} else {
+  // header + <SellerDashboardView sellerId={user.id} ... />  (igual ao atual)
+}
+```
+
+### Performance
+- 1 query `sales` (já existe) + 1 `goals` (já existe) + 1 `profiles` + 1 `user_roles` — todas cacheadas pelo React Query.
+- Nenhum gráfico novo. Recharts reutilizado. Realtime único (canal compartilhado).
+- Sem novos arquivos.
+
+### Fora de escopo
+Sidebar, tema, identidade visual, novos componentes, migrations.

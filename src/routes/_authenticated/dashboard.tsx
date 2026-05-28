@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSales } from "@/hooks/use-sales";
-import { useMyGoals, useAllGoals } from "@/hooks/use-goals";
+import { useSales, type Sale } from "@/hooks/use-sales";
+import { useMyGoals, useAllGoals, type Goal } from "@/hooks/use-goals";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,8 +16,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { TrendingUp, Wallet, Smartphone, Headphones, Users } from "lucide-react";
-
+import { TrendingUp, Wallet, Smartphone, Headphones } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -25,15 +24,115 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 type Range = "hoje" | "7" | "30";
 
+interface ProfileRow { id: string; full_name: string | null }
+interface RoleRow { user_id: string; role: string }
+
 function Dashboard() {
   const { user } = useAuth();
+  const { data: isAdmin } = useIsAdmin();
   const { data: allVendas = [], isLoading } = useSales();
-  const vendas = useMemo(
-    () => (user ? allVendas.filter((v) => v.seller_id === user.id) : []),
-    [allVendas, user],
+  const { data: myGoals = [] } = useMyGoals();
+  const { data: allGoals = [] } = useAllGoals();
+  const qc = useQueryClient();
+
+  // Realtime: invalida vendas a cada mudança (admin e vendedor)
+  useEffect(() => {
+    const channel = supabase
+      .channel("sales-dashboard-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => {
+        qc.invalidateQueries({ queryKey: ["sales"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
+  // Vendedores não-admin (exclui Leandro/admin automaticamente via role)
+  const profilesQ = useQuery({
+    enabled: !!isAdmin,
+    queryKey: ["admin", "profiles"],
+    queryFn: async (): Promise<ProfileRow[]> => {
+      const { data, error } = await supabase.from("profiles").select("id, full_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const rolesQ = useQuery({
+    enabled: !!isAdmin,
+    queryKey: ["admin", "user_roles"],
+    queryFn: async (): Promise<RoleRow[]> => {
+      const { data, error } = await supabase.from("user_roles").select("user_id, role");
+      if (error) throw error;
+      return (data ?? []) as RoleRow[];
+    },
+  });
+
+  const sellers = useMemo(() => {
+    const profiles = profilesQ.data ?? [];
+    const adminIds = new Set((rolesQ.data ?? []).filter(r => r.role === "admin").map(r => r.user_id));
+    return profiles
+      .filter(p => !adminIds.has(p.id))
+      .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-BR"));
+  }, [profilesQ.data, rolesQ.data]);
+
+  return (
+    <AppLayout>
+      <header className="mb-8 animate-vm-in">
+        <h1 className="text-2xl md:text-3xl text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isAdmin
+            ? "Acompanhe o desempenho de cada vendedor em tempo real."
+            : "Acompanhe o progresso de metas e comissões em tempo real."}
+        </p>
+      </header>
+
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-3 mb-6">
+          {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
+        </div>
+      ) : isAdmin ? (
+        <div className="grid gap-8 xl:grid-cols-2">
+          {sellers.map((s) => (
+            <div key={s.id} className="space-y-6">
+              <div className="text-sm text-muted-foreground border-l-2 border-primary pl-3">
+                {s.full_name ?? "—"}
+              </div>
+              <SellerDashboardView
+                sellerId={s.id}
+                sales={allVendas}
+                goals={allGoals.filter(g => g.user_id === s.id)}
+              />
+            </div>
+          ))}
+          {sellers.length === 0 && (
+            <div className="text-sm text-muted-foreground">Nenhum vendedor encontrado.</div>
+          )}
+        </div>
+      ) : user ? (
+        <SellerDashboardView
+          sellerId={user.id}
+          sales={allVendas}
+          goals={myGoals}
+        />
+      ) : null}
+    </AppLayout>
   );
-  const { data: goals = [] } = useMyGoals();
+}
+
+function SellerDashboardView({
+  sellerId,
+  sales,
+  goals,
+}: {
+  sellerId: string;
+  sales: Sale[];
+  goals: Goal[];
+}) {
   const [range, setRange] = useState<Range>("7");
+
+  const vendas = useMemo(
+    () => sales.filter((v) => v.seller_id === sellerId),
+    [sales, sellerId],
+  );
 
   const goalFor = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
     goals.find((g) => g.target_type === type && g.category_focus === focus)?.target_value ??
@@ -60,7 +159,7 @@ function Dashboard() {
   const lineData = useMemo(() => {
     const days = range === "hoje" ? 1 : range === "7" ? 7 : 30;
     return Array.from({ length: days }).map((_, i) => {
-      const day = new Date(now); day.setDate(now.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
+      const day = new Date(); day.setDate(day.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
       const next = new Date(day); next.setDate(day.getDate() + 1);
       const total = vendas
         .filter(v => { const d = new Date(v.sale_date); return d >= day && d < next; })
@@ -70,7 +169,6 @@ function Dashboard() {
         valor: total,
       };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendas, range]);
 
   const pieData = [
@@ -80,26 +178,12 @@ function Dashboard() {
   const PIE_COLORS = ["var(--primary)", "var(--chart-2)"];
 
   return (
-    <AppLayout>
-      <header className="mb-8 animate-vm-in">
-        <h1 className="text-2xl md:text-3xl text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Acompanhe o progresso de metas e comissões em tempo real.</p>
-      </header>
-
-      <AdminSellersPanel />
-
-
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
-        </div>
-      ) : (
-        <section className="grid gap-4 md:grid-cols-3 mb-6">
-          <KpiCard title="Meta Diária" current={totalDia} target={goalFor("diaria")} delay={0} />
-          <KpiCard title="Meta Semanal" current={totalSemana} target={goalFor("semanal")} delay={80} />
-          <KpiCard title="Meta Mensal" current={totalMes} target={goalFor("mensal")} delay={160} />
-        </section>
-      )}
+    <>
+      <section className="grid gap-4 md:grid-cols-3 mb-6">
+        <KpiCard title="Meta Diária" current={totalDia} target={goalFor("diaria")} delay={0} />
+        <KpiCard title="Meta Semanal" current={totalSemana} target={goalFor("semanal")} delay={80} />
+        <KpiCard title="Meta Mensal" current={totalMes} target={goalFor("mensal")} delay={160} />
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-3 mb-6">
         <Card className="lg:col-span-1 animate-vm-in" style={{ animationDelay: "240ms" }}>
@@ -176,7 +260,7 @@ function Dashboard() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-    </AppLayout>
+    </>
   );
 }
 
@@ -207,98 +291,3 @@ function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string
     </div>
   );
 }
-
-interface ProfileRow { id: string; full_name: string | null }
-
-function AdminSellersPanel() {
-  const { data: isAdmin } = useIsAdmin();
-  const qc = useQueryClient();
-  const { data: sales = [] } = useSales();
-  const { data: goals = [] } = useAllGoals();
-  const profilesQ = useQuery({
-    enabled: !!isAdmin,
-    queryKey: ["admin", "profiles"],
-    queryFn: async (): Promise<ProfileRow[]> => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    const channel = supabase
-      .channel("sales-admin-dashboard")
-      .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => {
-        qc.invalidateQueries({ queryKey: ["sales"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [isAdmin, qc]);
-
-  const startMonth = useMemo(() => {
-    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1);
-  }, []);
-
-  const rows = useMemo(() => {
-    if (!isAdmin) return [];
-    const profiles = profilesQ.data ?? [];
-    return profiles.map((p) => {
-      const mySales = sales.filter((s) => s.seller_id === p.id);
-      const monthSales = mySales.filter((s) => new Date(s.sale_date) >= startMonth);
-      const total = monthSales.reduce((acc, s) => acc + Number(s.sale_value), 0);
-      const comissao = monthSales.reduce((acc, s) => acc + Number(s.commission_value), 0);
-      const myGoals = goals.filter((g) => g.user_id === p.id);
-      const goalsHit = myGoals.filter((g) => {
-        const start = new Date(g.period_start);
-        const end = new Date(g.period_end); end.setHours(23, 59, 59, 999);
-        const inRange = mySales.filter((s) => {
-          const d = new Date(s.sale_date); return d >= start && d <= end;
-        });
-        const value = g.category_focus === "acessorios"
-          ? inRange.filter((s) => s.category !== CATEGORIA_APARELHO).reduce((a, s) => a + Number(s.sale_value), 0)
-          : inRange.reduce((a, s) => a + Number(s.sale_value), 0);
-        return value >= Number(g.target_value);
-      }).length;
-      return { id: p.id, name: p.full_name ?? "—", total, comissao, goalsHit, goalsTotal: myGoals.length };
-    }).sort((a, b) => b.total - a.total);
-  }, [isAdmin, profilesQ.data, sales, goals, startMonth]);
-
-  if (!isAdmin) return null;
-
-  return (
-    <section className="mb-8 animate-vm-in">
-      <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-        <Users className="h-4 w-4 text-primary" />
-        Vendedores (mês atual) — atualização em tempo real
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map((r) => (
-          <Card key={r.id}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-foreground">{r.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Total vendido</span>
-                <span className="text-base text-foreground">{formatBRL(r.total)}</span>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Comissão</span>
-                <span className="text-sm text-primary">{formatBRL(r.comissao)}</span>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Metas atingidas</span>
-                <span className="text-sm text-foreground">{r.goalsHit}/{r.goalsTotal}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {rows.length === 0 && (
-          <div className="text-sm text-muted-foreground">Nenhum vendedor encontrado.</div>
-        )}
-      </div>
-    </section>
-  );
-}
-
