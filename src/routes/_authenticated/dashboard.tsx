@@ -87,6 +87,8 @@ function Dashboard() {
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-3 mb-6">
+          {[0,1,2].map(i => <Skeleton key={i} className="h-32" />)}
+        </div>
       ) : isAdmin ? (
         <div className="grid gap-6 xl:grid-cols-2">
           {sellers.map((s) => (
@@ -103,9 +105,6 @@ function Dashboard() {
           ))}
           {sellers.length === 0 && (
             <div className="text-sm text-muted-foreground">Nenhum vendedor encontrado.</div>
-          )}
-        </div>
-
           )}
         </div>
       ) : user ? (
@@ -168,6 +167,17 @@ function SellerDashboardView({
       return {
         label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
         valor: total,
+      };
+    });
+  }, [vendas, range]);
+
+  const pieData = [
+    { name: "Aparelhos", value: Math.round(comissoesAparelhos) },
+    { name: "Acessórios", value: Math.round(comissoesAcessorios) },
+  ];
+  const PIE_COLORS = ["var(--primary)", "var(--chart-2)"];
+
+  return (
     <div className="min-w-0">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-4">
         <KpiCard title="Meta Diária" current={totalDia} target={goalFor("diaria")} delay={0} />
@@ -222,19 +232,6 @@ function SellerDashboardView({
             <TrendingUp className="h-4 w-4 text-primary shrink-0" /> <span className="truncate">Vendas no período</span>
           </CardTitle>
           <div className="flex gap-1 rounded-lg bg-secondary p-1 shrink-0">
-
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Card className="animate-vm-in" style={{ animationDelay: "400ms" }}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" /> Vendas no período
-          </CardTitle>
-          <div className="flex gap-1 rounded-lg bg-secondary p-1">
             {(["hoje","7","30"] as const).map(r => (
               <Button
                 key={r}
@@ -248,12 +245,12 @@ function SellerDashboardView({
             ))}
           </div>
         </CardHeader>
-        <CardContent className="h-[300px]">
+        <CardContent className="h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={lineData} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-              <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} width={48} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
                 formatter={(v: number) => formatBRL(v)}
@@ -263,21 +260,25 @@ function SellerDashboardView({
           </ResponsiveContainer>
         </CardContent>
       </Card>
-    </>
+    </div>
+  );
+}
+
   );
 }
 
 function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
+function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
-    <Card className="animate-vm-in" style={{ animationDelay: `${delay}ms` }}>
+    <Card className="animate-vm-in min-w-0 overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm text-muted-foreground truncate">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-baseline justify-between">
-          <span className="text-2xl text-foreground">{formatBRL(current)}</span>
-          <span className="text-xs text-muted-foreground">/ {formatBRL(target)}</span>
+        <div className="flex items-baseline justify-between gap-2 min-w-0">
+          <span className="text-xl text-foreground truncate">{formatBRL(current)}</span>
+          <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">/ {formatBRL(target)}</span>
         </div>
         <Progress value={pct} className="mt-3 h-2" />
         <div className="mt-2 text-xs text-primary">{pct}% atingido</div>
@@ -285,6 +286,7 @@ function KpiCard({ title, current, target, delay }: { title: string; current: nu
     </Card>
   );
 }
+
 
 function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
