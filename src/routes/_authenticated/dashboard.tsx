@@ -35,15 +35,13 @@ function Dashboard() {
   const { data: allGoals = [] } = useAllGoals();
   const qc = useQueryClient();
 
-  // Realtime: invalida vendas a cada mudança (admin e vendedor)
+  // Atualização automática por polling (a cada 30s) — evita expor eventos
+  // de vendas de outros vendedores via Realtime.
   useEffect(() => {
-    const channel = supabase
-      .channel("sales-dashboard-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => {
-        qc.invalidateQueries({ queryKey: ["sales"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const id = setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["sales"] });
+    }, 30000);
+    return () => clearInterval(id);
   }, [qc]);
 
   // Vendedores não-admin (exclui Leandro/admin automaticamente via role)
