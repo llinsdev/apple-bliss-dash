@@ -11,7 +11,7 @@ import { useMyGoals, useAllGoals, type Goal } from "@/hooks/use-goals";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
-import { METAS_DEFAULT, formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
+import { METAS_DEFAULT, formatBRL, CATEGORIA_APARELHO, parseSaleDate } from "@/lib/mock-data";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
