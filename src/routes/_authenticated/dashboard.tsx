@@ -179,7 +179,7 @@ function SellerDashboardView({
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const totalIn = (from: Date) =>
-    vendas.filter((v) => new Date(v.sale_date) >= from).reduce((s, v) => s + Number(v.sale_value), 0);
+    vendas.filter((v) => parseSaleDate(v.sale_date) >= from).reduce((s, v) => s + Number(v.sale_value), 0);
 
   const totalDia = totalIn(startOfDay);
   const totalSemana = totalIn(startOfWeek);
@@ -195,7 +195,7 @@ function SellerDashboardView({
       const day = new Date(); day.setDate(day.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
       const next = new Date(day); next.setDate(day.getDate() + 1);
       const total = vendas
-        .filter(v => { const d = new Date(v.sale_date); return d >= day && d < next; })
+        .filter(v => { const d = parseSaleDate(v.sale_date); return d >= day && d < next; })
         .reduce((s, v) => s + Number(v.sale_value), 0);
       return {
         label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
