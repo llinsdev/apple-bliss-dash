@@ -18,7 +18,7 @@ import {
   useSales, useCreateOrderSale, useDeleteSale,
   APARELHO_COMISSAO_PCT, ACESSORIO_COMISSAO_PCT,
 } from "@/hooks/use-sales";
-import { formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
+import { formatBRL, CATEGORIA_APARELHO, parseSaleDate } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
