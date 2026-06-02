@@ -5,6 +5,10 @@ export type Categoria = typeof CATEGORIA_APARELHO | typeof CATEGORIA_ACESSORIO;
 
 export const CATEGORIAS: Categoria[] = [CATEGORIA_APARELHO, CATEGORIA_ACESSORIO];
 
+// Interpreta uma data YYYY-MM-DD do Postgres como meia-noite LOCAL
+// (evita o desvio de UTC que joga vendas do dia atual para o dia anterior).
+export const parseSaleDate = (s: string) => new Date(`${s}T00:00:00`);
+
 export const formatBRL = (n: number) =>
   (n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
