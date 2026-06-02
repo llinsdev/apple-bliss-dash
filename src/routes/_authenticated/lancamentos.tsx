@@ -73,7 +73,7 @@ function Lancamentos() {
               {vendas.map(v => (
                 <TableRow key={v.id} className="border-border">
                   <TableCell className="text-muted-foreground">
-                    {new Date(v.sale_date).toLocaleDateString("pt-BR")}
+                    {parseSaleDate(v.sale_date).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-foreground">{v.product_name}</TableCell>
                   <TableCell>
