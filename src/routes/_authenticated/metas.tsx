@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useSales } from "@/hooks/use-sales";
 import { useMyGoals } from "@/hooks/use-goals";
-import { METAS_DEFAULT, formatBRL, CATEGORIA_ACESSORIO } from "@/lib/mock-data";
+import { METAS_DEFAULT, formatBRL, CATEGORIA_ACESSORIO, parseSaleDate } from "@/lib/mock-data";
 import { Trophy, Target, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/metas")({
@@ -17,7 +17,7 @@ function Metas() {
   const now = new Date();
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const doMes = vendas.filter(v => new Date(v.sale_date) >= startMonth);
+  const doMes = vendas.filter(v => parseSaleDate(v.sale_date) >= startMonth);
   const totalMes = doMes.reduce((s, v) => s + Number(v.sale_value), 0);
   const acessorios = doMes.filter(v => v.category === CATEGORIA_ACESSORIO).reduce((s, v) => s + Number(v.sale_value), 0);
 

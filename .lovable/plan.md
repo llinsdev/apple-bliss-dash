@@ -1,24 +1,43 @@
-Plano para corrigir o Dashboard ADMIN sem alterar identidade visual:
+## Bug encontrado
+Campo `sale_date` é `DATE` (ex.: `"2026-06-02"`). `new Date("2026-06-02")` é parseado como UTC 00:00, que no Brasil (UTC−3) vira 01/06 21:00 local. Por isso:
+- Meta **diária** não conta a venda de hoje (cai em "ontem").
+- Meta **mensal** subconta vendas do dia 1.
+- Meta **semanal** parece OK porque a janela de 7 dias absorve o desvio.
+- Marco "Primeira venda do mês" em `metas.tsx` falha pelo mesmo motivo.
+- Gráfico diário do dashboard também desloca valores.
 
-1. **Componente reutilizado**
-   - Reutilizar o `SellerDashboardView` já extraído do dashboard do vendedor.
-   - Ele continuará sendo responsável por exibir metas, comissões e gráficos com os mesmos cards, tipografia, cores e componentes atuais.
+## Atualização em tempo real
+Já está coberta:
+- Mutations (`useCreateSale`, `useCreateOrderSale`, `useDeleteSale`, `useUpsertGoal`, `useDeleteGoal`) invalidam `["sales"]` / `["goals"]` → dashboard e tela Metas atualizam na hora para quem lançou.
+- Polling de 30 s em `dashboard.tsx` cobre cross-session sem expor realtime de outros vendedores (decisão de segurança anterior).
 
-2. **Troca entre vendedores**
-   - No modo admin, substituir a grade lado a lado por um seletor simples no topo.
-   - Usar botões/tabs simples com os vendedores não-admin encontrados no banco.
-   - Mostrar somente Dominique e Mariano; Leandro será excluído por role admin como já acontece hoje.
+Não é necessário mexer em Supabase/RLS.
 
-3. **Evitar renderização duplicada**
-   - Renderizar apenas um `<SellerDashboardView />` por vez, usando o vendedor selecionado.
-   - Remover o `map` que cria vários dashboards simultâneos.
-   - Filtrar metas e vendas apenas para o vendedor ativo antes de passar para o componente.
+## Auditoria rápida
+- Comissão: calculada no trigger do banco (`set_commission_value`), OK.
+- Filtro por vendedor: `vendas.filter(seller_id === sellerId)`, OK.
+- Permissões: RLS já corrigida (admin-only UPDATE em sales).
+- Sem NaN/loops detectados; cards usam fallback `METAS_DEFAULT`.
 
-4. **Performance e realtime**
-   - Manter as queries atuais de `sales`, `goals`, `profiles` e `user_roles`, sem adicionar novas consultas.
-   - Manter o realtime atual invalidando `sales` quando houver nova venda.
-   - Como apenas um dashboard estará montado, apenas um conjunto de gráficos será renderizado.
+Único bug funcional crítico = parsing de data.
 
-5. **Responsividade**
-   - O seletor ficará em layout flexível com quebra de linha em telas pequenas.
-   - O dashboard selecionado ocupará largura total, evitando cortes, sobreposição e gráficos comprimidos.
+## Alterações
+1. `src/lib/mock-data.ts` — adicionar helper:
+   ```ts
+   export const parseSaleDate = (s: string) => new Date(`${s}T00:00:00`);
+   ```
+2. `src/routes/_authenticated/dashboard.tsx` — em `SellerDashboardView`, trocar todos os `new Date(v.sale_date)` por `parseSaleDate(v.sale_date)` (função `totalIn` e `lineData`).
+3. `src/routes/_authenticated/metas.tsx` — usar `parseSaleDate` no filtro `doMes`.
+4. `src/routes/_authenticated/lancamentos.tsx` — usar `parseSaleDate` na coluna Data para exibir o dia correto.
+
+## Fora do escopo
+- Design, dark mode, componentes, layout, sidebar.
+- Realtime via canal Supabase (mantém polling 30 s).
+- Schema, RLS, triggers.
+
+## Validação
+Após o patch:
+- Lançar venda hoje → Meta Diária, Semanal e Mensal aumentam imediatamente.
+- Marco "Primeira venda do mês" marca como concluído.
+- Tela Metas reflete novos valores na hora.
+- Comissão e filtro por vendedor inalterados.

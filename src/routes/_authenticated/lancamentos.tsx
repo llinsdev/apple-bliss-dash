@@ -18,7 +18,7 @@ import {
   useSales, useCreateOrderSale, useDeleteSale,
   APARELHO_COMISSAO_PCT, ACESSORIO_COMISSAO_PCT,
 } from "@/hooks/use-sales";
-import { formatBRL, CATEGORIA_APARELHO } from "@/lib/mock-data";
+import { formatBRL, CATEGORIA_APARELHO, parseSaleDate } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
@@ -73,7 +73,7 @@ function Lancamentos() {
               {vendas.map(v => (
                 <TableRow key={v.id} className="border-border">
                   <TableCell className="text-muted-foreground">
-                    {new Date(v.sale_date).toLocaleDateString("pt-BR")}
+                    {parseSaleDate(v.sale_date).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-foreground">{v.product_name}</TableCell>
                   <TableCell>
