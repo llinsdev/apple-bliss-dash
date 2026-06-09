@@ -316,6 +316,20 @@ function GoalDialog({
             <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} required />
           </div>
         </div>
+        {type === "semanal" && (
+          <div className="space-y-2">
+            <Label className="text-muted-foreground">Semana</Label>
+            <Select value={weekNumber} onValueChange={setWeekNumber}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Semana 1</SelectItem>
+                <SelectItem value="2">Semana 2</SelectItem>
+                <SelectItem value="3">Semana 3</SelectItem>
+                <SelectItem value="4">Semana 4</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button type="submit" disabled={upsert.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground">
