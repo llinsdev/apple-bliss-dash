@@ -57,6 +57,13 @@ function Metas() {
     const d = parseSaleDate(v.sale_date); return d >= mesFrom && d < mesToExcl;
   });
 
+  const marcos = [
+    { label: "Primeira venda do mês", done: temVendaNoPeriodoMes },
+    { label: "50% da meta mensal", done: totalMes >= targetMes * 0.5 },
+    { label: "Meta de acessórios atingida", done: acessorios >= targetAcc },
+    { label: "Meta mensal completa", done: totalMes >= targetMes },
+  ];
+
 
   return (
     <AppLayout>
