@@ -343,13 +343,14 @@ function SellerDashboardView({
   );
 }
 
-function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
+function KpiCard({ title, current, target, delay, subtitle }: { title: string; current: number; target: number; delay: number; subtitle?: string }) {
 
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
     <Card className="animate-vm-in min-w-0 overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm text-muted-foreground truncate">{title}</CardTitle>
+        {subtitle && <div className="text-xs text-muted-foreground/80 truncate">{subtitle}</div>}
       </CardHeader>
       <CardContent>
         <div className="flex items-baseline justify-between gap-2 min-w-0">
@@ -362,6 +363,7 @@ function KpiCard({ title, current, target, delay }: { title: string; current: nu
     </Card>
   );
 }
+
 
 
 function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
