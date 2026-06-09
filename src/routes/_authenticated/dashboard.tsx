@@ -220,16 +220,29 @@ function SellerDashboardView({
   const totalDia = sumInRange(today, dayEnd);
   const targetDiaria = activeGoal("diaria")?.target_value ?? defaultTarget("diaria");
 
-  // Semanal: usa OBRIGATORIAMENTE o período da meta cadastrada pelo admin.
-  const goalSemanal = activeGoal("semanal");
+  // Semanal: se o admin selecionou uma semana (1..4), usa a meta com aquele week_number.
+  // Caso contrário, usa a meta semanal cujo período contém hoje.
+  const goalSemanal =
+    selectedWeek != null
+      ? goals.find(
+          (g) =>
+            g.target_type === "semanal" &&
+            g.category_focus === "total" &&
+            g.week_number === selectedWeek,
+        )
+      : activeGoal("semanal");
   let totalSemana = 0;
   let semanaLabel: string | null = null;
+  let semanaFrom: Date | null = null;
+  let semanaToExcl: Date | null = null;
   if (goalSemanal) {
     const from = parseSaleDate(goalSemanal.period_start);
     const toExcl = parseSaleDate(goalSemanal.period_end);
     toExcl.setDate(toExcl.getDate() + 1);
     totalSemana = sumInRange(from, toExcl);
     semanaLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalSemanal.period_end))}`;
+    semanaFrom = from;
+    semanaToExcl = toExcl;
   }
   const targetSemanal = goalSemanal?.target_value ?? defaultTarget("semanal");
 
