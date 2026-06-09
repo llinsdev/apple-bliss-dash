@@ -60,6 +60,7 @@ export type Database = {
           target_type: string
           target_value: number
           user_id: string
+          week_number: number | null
         }
         Insert: {
           category_focus: string
@@ -70,6 +71,7 @@ export type Database = {
           target_type: string
           target_value: number
           user_id: string
+          week_number?: number | null
         }
         Update: {
           category_focus?: string
@@ -80,6 +82,7 @@ export type Database = {
           target_type?: string
           target_value?: number
           user_id?: string
+          week_number?: number | null
         }
         Relationships: [
           {

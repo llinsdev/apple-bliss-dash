@@ -1,0 +1,1 @@
+ALTER TABLE public.goals ADD COLUMN IF NOT EXISTS week_number smallint CHECK (week_number IS NULL OR week_number BETWEEN 1 AND 4);
