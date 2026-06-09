@@ -263,11 +263,34 @@ function SellerDashboardView({
   }
   const targetMensal = goalMensal?.target_value ?? defaultTarget("mensal");
 
-  const comissoes = vendas.reduce((s, v) => s + Number(v.commission_value), 0);
-  const comissoesAparelhos = vendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
+  // Quando uma semana está selecionada, comissões e gráfico refletem o período da semana.
+  const weekScopedVendas =
+    selectedWeek != null && semanaFrom && semanaToExcl
+      ? vendas.filter((v) => {
+          const d = parseSaleDate(v.sale_date);
+          return d >= semanaFrom! && d < semanaToExcl!;
+        })
+      : vendas;
+
+  const comissoes = weekScopedVendas.reduce((s, v) => s + Number(v.commission_value), 0);
+  const comissoesAparelhos = weekScopedVendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAcessorios = comissoes - comissoesAparelhos;
 
   const lineData = useMemo(() => {
+    if (selectedWeek != null && semanaFrom && semanaToExcl) {
+      const days = Math.max(1, Math.round((semanaToExcl.getTime() - semanaFrom.getTime()) / 86400000));
+      return Array.from({ length: days }).map((_, i) => {
+        const day = new Date(semanaFrom!); day.setDate(semanaFrom!.getDate() + i);
+        const next = new Date(day); next.setDate(day.getDate() + 1);
+        const total = vendas
+          .filter(v => { const d = parseSaleDate(v.sale_date); return d >= day && d < next; })
+          .reduce((s, v) => s + Number(v.sale_value), 0);
+        return {
+          label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          valor: total,
+        };
+      });
+    }
     const days = range === "hoje" ? 1 : range === "7" ? 7 : 30;
     return Array.from({ length: days }).map((_, i) => {
       const day = new Date(); day.setDate(day.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
@@ -280,7 +303,8 @@ function SellerDashboardView({
         valor: total,
       };
     });
-  }, [vendas, range]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendas, range, selectedWeek, semanaFrom?.getTime(), semanaToExcl?.getTime()]);
 
   const pieData = [
     { name: "Aparelhos", value: Math.round(comissoesAparelhos) },
