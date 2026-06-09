@@ -178,10 +178,12 @@ function SellerDashboardView({
   sellerId,
   sales,
   goals,
+  selectedWeek = null,
 }: {
   sellerId: string;
   sales: Sale[];
   goals: Goal[];
+  selectedWeek?: number | null;
 }) {
   const [range, setRange] = useState<Range>("7");
 
