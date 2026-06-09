@@ -167,23 +167,63 @@ function SellerDashboardView({
     [sales, sellerId],
   );
 
-  const goalFor = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
-    goals.find((g) => g.target_type === type && g.category_focus === focus)?.target_value ??
-    (focus === "acessorios" ? METAS_DEFAULT.acessoriosMensal :
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Meta ativa = aquela cujo período [start, end] (inclusive) contém hoje.
+  const activeGoal = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
+    goals.find((g) => {
+      if (g.target_type !== type || g.category_focus !== focus) return false;
+      const ps = parseSaleDate(g.period_start);
+      const pe = parseSaleDate(g.period_end);
+      return ps <= today && today <= pe;
+    });
+
+  const defaultTarget = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
+    focus === "acessorios" ? METAS_DEFAULT.acessoriosMensal :
       type === "diaria" ? METAS_DEFAULT.diaria :
-      type === "semanal" ? METAS_DEFAULT.semanal : METAS_DEFAULT.mensal);
+      type === "semanal" ? METAS_DEFAULT.semanal : METAS_DEFAULT.mensal;
 
-  const now = new Date();
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
-  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - 6); startOfWeek.setHours(0, 0, 0, 0);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sumInRange = (from: Date, toExclusive: Date) =>
+    vendas
+      .filter((v) => { const d = parseSaleDate(v.sale_date); return d >= from && d < toExclusive; })
+      .reduce((s, v) => s + Number(v.sale_value), 0);
 
-  const totalIn = (from: Date) =>
-    vendas.filter((v) => parseSaleDate(v.sale_date) >= from).reduce((s, v) => s + Number(v.sale_value), 0);
+  const fmtBR = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-  const totalDia = totalIn(startOfDay);
-  const totalSemana = totalIn(startOfWeek);
-  const totalMes = totalIn(startOfMonth);
+  // Diária: sempre o dia de hoje.
+  const dayEnd = new Date(today); dayEnd.setDate(today.getDate() + 1);
+  const totalDia = sumInRange(today, dayEnd);
+  const targetDiaria = activeGoal("diaria")?.target_value ?? defaultTarget("diaria");
+
+  // Semanal: usa OBRIGATORIAMENTE o período da meta cadastrada pelo admin.
+  const goalSemanal = activeGoal("semanal");
+  let totalSemana = 0;
+  let semanaLabel: string | null = null;
+  if (goalSemanal) {
+    const from = parseSaleDate(goalSemanal.period_start);
+    const toExcl = parseSaleDate(goalSemanal.period_end);
+    toExcl.setDate(toExcl.getDate() + 1);
+    totalSemana = sumInRange(from, toExcl);
+    semanaLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalSemanal.period_end))}`;
+  }
+  const targetSemanal = goalSemanal?.target_value ?? defaultTarget("semanal");
+
+  // Mensal: usa período da meta se houver; senão mês corrente.
+  const goalMensal = activeGoal("mensal");
+  let totalMes = 0;
+  let mesLabel: string | null = null;
+  if (goalMensal) {
+    const from = parseSaleDate(goalMensal.period_start);
+    const toExcl = parseSaleDate(goalMensal.period_end);
+    toExcl.setDate(toExcl.getDate() + 1);
+    totalMes = sumInRange(from, toExcl);
+    mesLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalMensal.period_end))}`;
+  } else {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    const toExcl = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    totalMes = sumInRange(from, toExcl);
+  }
+  const targetMensal = goalMensal?.target_value ?? defaultTarget("mensal");
 
   const comissoes = vendas.reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAparelhos = vendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
@@ -213,9 +253,15 @@ function SellerDashboardView({
   return (
     <div className="min-w-0">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-4">
-        <KpiCard title="Meta Diária" current={totalDia} target={goalFor("diaria")} delay={0} />
-        <KpiCard title="Meta Semanal" current={totalSemana} target={goalFor("semanal")} delay={80} />
-        <KpiCard title="Meta Mensal" current={totalMes} target={goalFor("mensal")} delay={160} />
+        <KpiCard title="Meta Diária" current={totalDia} target={targetDiaria} delay={0} />
+        <KpiCard
+          title="Meta Semanal"
+          current={totalSemana}
+          target={targetSemanal}
+          delay={80}
+          subtitle={semanaLabel ?? "Sem período cadastrado"}
+        />
+        <KpiCard title="Meta Mensal" current={totalMes} target={targetMensal} delay={160} subtitle={mesLabel ?? undefined} />
       </section>
 
       <section className="grid gap-3 lg:grid-cols-3 mb-4">
@@ -297,13 +343,14 @@ function SellerDashboardView({
   );
 }
 
-function KpiCard({ title, current, target, delay }: { title: string; current: number; target: number; delay: number }) {
+function KpiCard({ title, current, target, delay, subtitle }: { title: string; current: number; target: number; delay: number; subtitle?: string }) {
 
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
     <Card className="animate-vm-in min-w-0 overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm text-muted-foreground truncate">{title}</CardTitle>
+        {subtitle && <div className="text-xs text-muted-foreground/80 truncate">{subtitle}</div>}
       </CardHeader>
       <CardContent>
         <div className="flex items-baseline justify-between gap-2 min-w-0">
@@ -316,6 +363,7 @@ function KpiCard({ title, current, target, delay }: { title: string; current: nu
     </Card>
   );
 }
+
 
 
 function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

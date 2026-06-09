@@ -14,22 +14,56 @@ export const Route = createFileRoute("/_authenticated/metas")({
 function Metas() {
   const { data: vendas = [] } = useSales();
   const { data: goals = [] } = useMyGoals();
-  const now = new Date();
-  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  const doMes = vendas.filter(v => parseSaleDate(v.sale_date) >= startMonth);
-  const totalMes = doMes.reduce((s, v) => s + Number(v.sale_value), 0);
-  const acessorios = doMes.filter(v => v.category === CATEGORIA_ACESSORIO).reduce((s, v) => s + Number(v.sale_value), 0);
+  const activeGoal = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios") =>
+    goals.find((g) => {
+      if (g.target_type !== type || g.category_focus !== focus) return false;
+      const ps = parseSaleDate(g.period_start);
+      const pe = parseSaleDate(g.period_end);
+      return ps <= today && today <= pe;
+    });
 
-  const targetMes = goals.find(g => g.target_type === "mensal" && g.category_focus === "total")?.target_value ?? METAS_DEFAULT.mensal;
-  const targetAcc = goals.find(g => g.target_type === "mensal" && g.category_focus === "acessorios")?.target_value ?? METAS_DEFAULT.acessoriosMensal;
+  const sumIn = (from: Date, toExcl: Date) =>
+    vendas
+      .filter((v) => { const d = parseSaleDate(v.sale_date); return d >= from && d < toExcl; })
+      .reduce((s, v) => s + Number(v.sale_value), 0);
+
+  const accSumIn = (from: Date, toExcl: Date) =>
+    vendas
+      .filter((v) => v.category === CATEGORIA_ACESSORIO)
+      .filter((v) => { const d = parseSaleDate(v.sale_date); return d >= from && d < toExcl; })
+      .reduce((s, v) => s + Number(v.sale_value), 0);
+
+  // Mensal — usa período da meta se houver; senão mês corrente.
+  const gMes = activeGoal("mensal", "total");
+  const mesFrom = gMes ? parseSaleDate(gMes.period_start) : new Date(today.getFullYear(), today.getMonth(), 1);
+  const mesToExcl = gMes
+    ? (() => { const d = parseSaleDate(gMes.period_end); d.setDate(d.getDate() + 1); return d; })()
+    : new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const totalMes = sumIn(mesFrom, mesToExcl);
+  const targetMes = gMes?.target_value ?? METAS_DEFAULT.mensal;
+
+  // Acessórios — período da meta se houver; senão mês corrente.
+  const gAcc = activeGoal("mensal", "acessorios");
+  const accFrom = gAcc ? parseSaleDate(gAcc.period_start) : mesFrom;
+  const accToExcl = gAcc
+    ? (() => { const d = parseSaleDate(gAcc.period_end); d.setDate(d.getDate() + 1); return d; })()
+    : mesToExcl;
+  const acessorios = accSumIn(accFrom, accToExcl);
+  const targetAcc = gAcc?.target_value ?? METAS_DEFAULT.acessoriosMensal;
+
+  const temVendaNoPeriodoMes = sumIn(mesFrom, mesToExcl) > 0 || vendas.some((v) => {
+    const d = parseSaleDate(v.sale_date); return d >= mesFrom && d < mesToExcl;
+  });
 
   const marcos = [
-    { label: "Primeira venda do mês", done: doMes.length > 0 },
+    { label: "Primeira venda do mês", done: temVendaNoPeriodoMes },
     { label: "50% da meta mensal", done: totalMes >= targetMes * 0.5 },
     { label: "Meta de acessórios atingida", done: acessorios >= targetAcc },
     { label: "Meta mensal completa", done: totalMes >= targetMes },
   ];
+
 
   return (
     <AppLayout>
