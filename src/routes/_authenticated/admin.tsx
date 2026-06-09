@@ -23,7 +23,7 @@ import {
   useAllGoals, useUpsertGoal, useDeleteGoal,
   type Goal, type GoalType, type GoalFocus,
 } from "@/hooks/use-goals";
-import { formatBRL } from "@/lib/mock-data";
+import { formatBRL, parseSaleDate } from "@/lib/mock-data";
 import { ShieldCheck, Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
@@ -81,19 +81,24 @@ function Admin() {
   const [openGoal, setOpenGoal] = useState(false);
   const [defaultUserId, setDefaultUserId] = useState<string | null>(null);
 
-  const startMonth = useMemo(() => {
-    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1);
+  const { startMonth, nextMonth } = useMemo(() => {
+    const d = new Date();
+    return {
+      startMonth: new Date(d.getFullYear(), d.getMonth(), 1),
+      nextMonth: new Date(d.getFullYear(), d.getMonth() + 1, 1),
+    };
   }, []);
 
   const totalsByUser = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of sales) {
-      if (new Date(s.sale_date) >= startMonth) {
+      const dt = parseSaleDate(s.sale_date);
+      if (dt >= startMonth && dt < nextMonth) {
         m.set(s.seller_id, (m.get(s.seller_id) ?? 0) + Number(s.sale_value));
       }
     }
     return m;
-  }, [sales, startMonth]);
+  }, [sales, startMonth, nextMonth]);
 
   const profiles = profilesQ.data ?? [];
   const roles = rolesQ.data ?? [];
