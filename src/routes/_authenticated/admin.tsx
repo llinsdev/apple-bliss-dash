@@ -246,13 +246,15 @@ function GoalDialog({
   const [focus, setFocus] = useState<GoalFocus>(editing?.category_focus ?? "total");
   const [start, setStart] = useState(editing?.period_start ?? today);
   const [end, setEnd] = useState(editing?.period_end ?? today);
+  const [weekNumber, setWeekNumber] = useState<string>(editing?.week_number ? String(editing.week_number) : "1");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const v = parseFloat(value);
     if (!userId || isNaN(v)) return;
+    const wn = type === "semanal" ? parseInt(weekNumber, 10) : null;
     upsert.mutate(
-      { id: editing?.id, user_id: userId, target_value: v, target_type: type, category_focus: focus, period_start: start, period_end: end },
+      { id: editing?.id, user_id: userId, target_value: v, target_type: type, category_focus: focus, period_start: start, period_end: end, week_number: wn },
       {
         onSuccess: () => { toast.success(editing ? "Meta atualizada" : "Meta criada"); onClose(); },
         onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
@@ -314,6 +316,20 @@ function GoalDialog({
             <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} required />
           </div>
         </div>
+        {type === "semanal" && (
+          <div className="space-y-2">
+            <Label className="text-muted-foreground">Semana</Label>
+            <Select value={weekNumber} onValueChange={setWeekNumber}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Semana 1</SelectItem>
+                <SelectItem value="2">Semana 2</SelectItem>
+                <SelectItem value="3">Semana 3</SelectItem>
+                <SelectItem value="4">Semana 4</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button type="submit" disabled={upsert.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground">

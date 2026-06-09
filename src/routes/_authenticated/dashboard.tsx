@@ -110,6 +110,7 @@ function AdminSellerSwitcher({
   allGoals: Goal[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const activeId = selectedId ?? sellers[0]?.id ?? null;
   const activeGoals = useMemo(
     () => (activeId ? allGoals.filter((g) => g.user_id === activeId) : []),
@@ -139,12 +140,34 @@ function AdminSellerSwitcher({
           </Button>
         ))}
       </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button
+          variant={selectedWeek === null ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedWeek(null)}
+          className={selectedWeek === null ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8" : "h-8"}
+        >
+          Todas
+        </Button>
+        {[1, 2, 3, 4].map((w) => (
+          <Button
+            key={w}
+            variant={selectedWeek === w ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedWeek(w)}
+            className={selectedWeek === w ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8" : "h-8"}
+          >
+            Semana {w}
+          </Button>
+        ))}
+      </div>
       {activeId && (
         <SellerDashboardView
-          key={activeId}
+          key={`${activeId}-${selectedWeek ?? "all"}`}
           sellerId={activeId}
           sales={sales}
           goals={activeGoals}
+          selectedWeek={selectedWeek}
         />
       )}
     </div>
@@ -155,10 +178,12 @@ function SellerDashboardView({
   sellerId,
   sales,
   goals,
+  selectedWeek = null,
 }: {
   sellerId: string;
   sales: Sale[];
   goals: Goal[];
+  selectedWeek?: number | null;
 }) {
   const [range, setRange] = useState<Range>("7");
 
@@ -195,16 +220,29 @@ function SellerDashboardView({
   const totalDia = sumInRange(today, dayEnd);
   const targetDiaria = activeGoal("diaria")?.target_value ?? defaultTarget("diaria");
 
-  // Semanal: usa OBRIGATORIAMENTE o período da meta cadastrada pelo admin.
-  const goalSemanal = activeGoal("semanal");
+  // Semanal: se o admin selecionou uma semana (1..4), usa a meta com aquele week_number.
+  // Caso contrário, usa a meta semanal cujo período contém hoje.
+  const goalSemanal =
+    selectedWeek != null
+      ? goals.find(
+          (g) =>
+            g.target_type === "semanal" &&
+            g.category_focus === "total" &&
+            g.week_number === selectedWeek,
+        )
+      : activeGoal("semanal");
   let totalSemana = 0;
   let semanaLabel: string | null = null;
+  let semanaFrom: Date | null = null;
+  let semanaToExcl: Date | null = null;
   if (goalSemanal) {
     const from = parseSaleDate(goalSemanal.period_start);
     const toExcl = parseSaleDate(goalSemanal.period_end);
     toExcl.setDate(toExcl.getDate() + 1);
     totalSemana = sumInRange(from, toExcl);
     semanaLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalSemanal.period_end))}`;
+    semanaFrom = from;
+    semanaToExcl = toExcl;
   }
   const targetSemanal = goalSemanal?.target_value ?? defaultTarget("semanal");
 
@@ -225,11 +263,34 @@ function SellerDashboardView({
   }
   const targetMensal = goalMensal?.target_value ?? defaultTarget("mensal");
 
-  const comissoes = vendas.reduce((s, v) => s + Number(v.commission_value), 0);
-  const comissoesAparelhos = vendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
+  // Quando uma semana está selecionada, comissões e gráfico refletem o período da semana.
+  const weekScopedVendas =
+    selectedWeek != null && semanaFrom && semanaToExcl
+      ? vendas.filter((v) => {
+          const d = parseSaleDate(v.sale_date);
+          return d >= semanaFrom! && d < semanaToExcl!;
+        })
+      : vendas;
+
+  const comissoes = weekScopedVendas.reduce((s, v) => s + Number(v.commission_value), 0);
+  const comissoesAparelhos = weekScopedVendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAcessorios = comissoes - comissoesAparelhos;
 
   const lineData = useMemo(() => {
+    if (selectedWeek != null && semanaFrom && semanaToExcl) {
+      const days = Math.max(1, Math.round((semanaToExcl.getTime() - semanaFrom.getTime()) / 86400000));
+      return Array.from({ length: days }).map((_, i) => {
+        const day = new Date(semanaFrom!); day.setDate(semanaFrom!.getDate() + i);
+        const next = new Date(day); next.setDate(day.getDate() + 1);
+        const total = vendas
+          .filter(v => { const d = parseSaleDate(v.sale_date); return d >= day && d < next; })
+          .reduce((s, v) => s + Number(v.sale_value), 0);
+        return {
+          label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          valor: total,
+        };
+      });
+    }
     const days = range === "hoje" ? 1 : range === "7" ? 7 : 30;
     return Array.from({ length: days }).map((_, i) => {
       const day = new Date(); day.setDate(day.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
@@ -242,7 +303,8 @@ function SellerDashboardView({
         valor: total,
       };
     });
-  }, [vendas, range]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendas, range, selectedWeek, semanaFrom?.getTime(), semanaToExcl?.getTime()]);
 
   const pieData = [
     { name: "Aparelhos", value: Math.round(comissoesAparelhos) },
