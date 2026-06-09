@@ -110,6 +110,7 @@ function AdminSellerSwitcher({
   allGoals: Goal[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const activeId = selectedId ?? sellers[0]?.id ?? null;
   const activeGoals = useMemo(
     () => (activeId ? allGoals.filter((g) => g.user_id === activeId) : []),
@@ -139,12 +140,34 @@ function AdminSellerSwitcher({
           </Button>
         ))}
       </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button
+          variant={selectedWeek === null ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedWeek(null)}
+          className={selectedWeek === null ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8" : "h-8"}
+        >
+          Todas
+        </Button>
+        {[1, 2, 3, 4].map((w) => (
+          <Button
+            key={w}
+            variant={selectedWeek === w ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedWeek(w)}
+            className={selectedWeek === w ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8" : "h-8"}
+          >
+            Semana {w}
+          </Button>
+        ))}
+      </div>
       {activeId && (
         <SellerDashboardView
-          key={activeId}
+          key={`${activeId}-${selectedWeek ?? "all"}`}
           sellerId={activeId}
           sales={sales}
           goals={activeGoals}
+          selectedWeek={selectedWeek}
         />
       )}
     </div>
