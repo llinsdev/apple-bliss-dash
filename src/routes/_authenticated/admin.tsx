@@ -246,13 +246,15 @@ function GoalDialog({
   const [focus, setFocus] = useState<GoalFocus>(editing?.category_focus ?? "total");
   const [start, setStart] = useState(editing?.period_start ?? today);
   const [end, setEnd] = useState(editing?.period_end ?? today);
+  const [weekNumber, setWeekNumber] = useState<string>(editing?.week_number ? String(editing.week_number) : "1");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const v = parseFloat(value);
     if (!userId || isNaN(v)) return;
+    const wn = type === "semanal" ? parseInt(weekNumber, 10) : null;
     upsert.mutate(
-      { id: editing?.id, user_id: userId, target_value: v, target_type: type, category_focus: focus, period_start: start, period_end: end },
+      { id: editing?.id, user_id: userId, target_value: v, target_type: type, category_focus: focus, period_start: start, period_end: end, week_number: wn },
       {
         onSuccess: () => { toast.success(editing ? "Meta atualizada" : "Meta criada"); onClose(); },
         onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
