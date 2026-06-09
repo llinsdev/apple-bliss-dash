@@ -13,6 +13,7 @@ export interface Goal {
   category_focus: GoalFocus;
   period_start: string;
   period_end: string;
+  week_number: number | null;
   created_at: string;
 }
 
@@ -50,6 +51,7 @@ export interface GoalInput {
   category_focus: GoalFocus;
   period_start: string;
   period_end: string;
+  week_number?: number | null;
 }
 
 export function useUpsertGoal() {
