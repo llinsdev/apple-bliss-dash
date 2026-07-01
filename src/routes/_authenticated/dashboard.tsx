@@ -76,7 +76,7 @@ function Dashboard() {
 
   return (
     <AppLayout>
-      <header className="mb-8 animate-vm-in">
+      <header className="mb-4 animate-vm-in">
         <h1 className="text-2xl md:text-3xl text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {isAdmin
@@ -84,6 +84,8 @@ function Dashboard() {
             : "Acompanhe o progresso de metas e comissões em tempo real."}
         </p>
       </header>
+
+      <MonthSelector />
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-3 mb-6">
