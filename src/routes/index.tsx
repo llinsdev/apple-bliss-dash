@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Mail, Lock, User as UserIcon } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 import vmLogo from "@/assets/vm-logo.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,8 @@ export const Route = createFileRoute("/")({
 function LoginPage() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [nome, setNome] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -29,15 +27,9 @@ function LoginPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "signin") {
-        const { error } = await authApi.signIn(email, senha);
-        if (error) throw error;
-        toast.success("Bem-vindo de volta");
-      } else {
-        const { error } = await authApi.signUp(email, senha, nome || email.split("@")[0]);
-        if (error) throw error;
-        toast.success("Conta criada com sucesso");
-      }
+      const { error } = await authApi.signIn(email, senha);
+      if (error) throw error;
+      toast.success("Bem-vindo de volta");
       navigate({ to: "/dashboard" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao autenticar");
@@ -65,37 +57,7 @@ function LoginPage() {
           onSubmit={submit}
           className="rounded-2xl border border-border bg-card p-6 md:p-8 shadow-xl"
         >
-          <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1">
-            {(["signin", "signup"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`h-9 rounded-md text-sm transition-colors ${
-                  mode === m
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {m === "signin" ? "Entrar" : "Criar conta"}
-              </button>
-            ))}
-          </div>
-
           <div className="space-y-5">
-            {mode === "signup" && (
-              <div className="space-y-2">
-                <Label htmlFor="nome" className="text-muted-foreground">Nome completo</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="nome" required value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    className="pl-10 h-11 bg-input border-border"
-                  />
-                </div>
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-muted-foreground">E-mail</Label>
               <div className="relative">
@@ -122,12 +84,14 @@ function LoginPage() {
               type="submit" disabled={busy}
               className="h-11 w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              {busy ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
+              {busy ? "Aguarde..." : "Entrar"}
             </Button>
           </div>
         </form>
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Acesso interno · VM STORE © {new Date().getFullYear()}
+          <br />
+          Novas contas são criadas apenas pelo administrador.
         </p>
       </div>
     </div>
