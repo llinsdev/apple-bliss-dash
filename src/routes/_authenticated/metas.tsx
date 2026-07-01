@@ -3,8 +3,10 @@ import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useSales } from "@/hooks/use-sales";
-import { useMyGoals } from "@/hooks/use-goals";
+import { useMyGoals, type Goal } from "@/hooks/use-goals";
 import { METAS_DEFAULT, formatBRL, CATEGORIA_ACESSORIO, parseSaleDate } from "@/lib/mock-data";
+import { useSelectedMonth } from "@/lib/selected-month";
+import { MonthSelector } from "@/components/month-selector";
 import { Trophy, Target, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/metas")({
@@ -14,15 +16,15 @@ export const Route = createFileRoute("/_authenticated/metas")({
 function Metas() {
   const { data: vendas = [] } = useSales();
   const { data: goals = [] } = useMyGoals();
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const { startDate: monthStart, endDateExcl: monthEnd } = useSelectedMonth();
+
+  const goalInMonth = (g: Goal) => {
+    const ps = parseSaleDate(g.period_start);
+    return ps >= monthStart && ps < monthEnd;
+  };
 
   const activeGoal = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios") =>
-    goals.find((g) => {
-      if (g.target_type !== type || g.category_focus !== focus) return false;
-      const ps = parseSaleDate(g.period_start);
-      const pe = parseSaleDate(g.period_end);
-      return ps <= today && today <= pe;
-    });
+    goals.find((g) => g.target_type === type && g.category_focus === focus && goalInMonth(g));
 
   const sumIn = (from: Date, toExcl: Date) =>
     vendas
@@ -35,52 +37,55 @@ function Metas() {
       .filter((v) => { const d = parseSaleDate(v.sale_date); return d >= from && d < toExcl; })
       .reduce((s, v) => s + Number(v.sale_value), 0);
 
-  // Mensal — usa período da meta se houver; senão mês corrente.
+  // Mensal — usa período da meta se houver; senão o mês selecionado.
   const gMes = activeGoal("mensal", "total");
-  const mesFrom = gMes ? parseSaleDate(gMes.period_start) : new Date(today.getFullYear(), today.getMonth(), 1);
+  const mesFrom = gMes ? parseSaleDate(gMes.period_start) : monthStart;
   const mesToExcl = gMes
     ? (() => { const d = parseSaleDate(gMes.period_end); d.setDate(d.getDate() + 1); return d; })()
-    : new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    : monthEnd;
   const totalMes = sumIn(mesFrom, mesToExcl);
   const targetMes = gMes?.target_value ?? METAS_DEFAULT.mensal;
 
-  // Acessórios — período da meta se houver; senão mês corrente.
+  // Acessórios — período da meta se houver; senão mês selecionado.
   const gAcc = activeGoal("mensal", "acessorios");
-  const accFrom = gAcc ? parseSaleDate(gAcc.period_start) : mesFrom;
+  const accFrom = gAcc ? parseSaleDate(gAcc.period_start) : monthStart;
   const accToExcl = gAcc
     ? (() => { const d = parseSaleDate(gAcc.period_end); d.setDate(d.getDate() + 1); return d; })()
-    : mesToExcl;
+    : monthEnd;
   const acessorios = accSumIn(accFrom, accToExcl);
   const targetAcc = gAcc?.target_value ?? METAS_DEFAULT.acessoriosMensal;
 
-  const temVendaNoPeriodoMes = sumIn(mesFrom, mesToExcl) > 0 || vendas.some((v) => {
-    const d = parseSaleDate(v.sale_date); return d >= mesFrom && d < mesToExcl;
+  const temVendaNoMes = vendas.some((v) => {
+    const d = parseSaleDate(v.sale_date); return d >= monthStart && d < monthEnd;
   });
 
   const marcos = [
-    { label: "Primeira venda do mês", done: temVendaNoPeriodoMes },
+    { label: "Primeira venda do mês", done: temVendaNoMes },
     { label: "50% da meta mensal", done: totalMes >= targetMes * 0.5 },
     { label: "Meta de acessórios atingida", done: acessorios >= targetAcc },
     { label: "Meta mensal completa", done: totalMes >= targetMes },
   ];
 
+  const goalsDoMes = goals.filter(goalInMonth);
 
   return (
     <AppLayout>
-      <header className="mb-6 animate-vm-in">
+      <header className="mb-4 animate-vm-in">
         <h1 className="text-2xl md:text-3xl text-foreground">Metas</h1>
         <p className="text-sm text-muted-foreground mt-1">Configuração e progresso das metas mensais.</p>
       </header>
+
+      <MonthSelector />
 
       <div className="grid gap-4 md:grid-cols-2 mb-6">
         <MetaCard title="Vendas Totais (mês)" icon={<Target className="h-4 w-4" />} current={totalMes} target={targetMes} />
         <MetaCard title="Vendas de Acessórios (mês)" icon={<Target className="h-4 w-4" />} current={acessorios} target={targetAcc} />
       </div>
 
-      {goals.length === 0 && (
+      {goalsDoMes.length === 0 && (
         <Card className="mb-6 border-primary/30 bg-primary/5 animate-vm-in">
           <CardContent className="py-4 text-sm text-muted-foreground">
-            Nenhuma meta personalizada definida. Os valores acima são padrão — peça ao admin para configurar.
+            Nenhuma meta cadastrada para este mês. Os valores acima são padrão — peça ao admin para configurar.
           </CardContent>
         </Card>
       )}

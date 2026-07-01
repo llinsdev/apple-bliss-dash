@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { METAS_DEFAULT, formatBRL, CATEGORIA_APARELHO, parseSaleDate } from "@/lib/mock-data";
+import { useSelectedMonth, useRefDate } from "@/lib/selected-month";
+import { MonthSelector } from "@/components/month-selector";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
@@ -74,7 +76,7 @@ function Dashboard() {
 
   return (
     <AppLayout>
-      <header className="mb-8 animate-vm-in">
+      <header className="mb-4 animate-vm-in">
         <h1 className="text-2xl md:text-3xl text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {isAdmin
@@ -82,6 +84,8 @@ function Dashboard() {
             : "Acompanhe o progresso de metas e comissões em tempo real."}
         </p>
       </header>
+
+      <MonthSelector />
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-3 mb-6">
@@ -186,21 +190,31 @@ function SellerDashboardView({
   selectedWeek?: number | null;
 }) {
   const [range, setRange] = useState<Range>("7");
+  const { startDate: monthStart, endDateExcl: monthEnd, isCurrentMonth } = useSelectedMonth();
+  const refDate = useRefDate();
 
   const vendas = useMemo(
     () => sales.filter((v) => v.seller_id === sellerId),
     [sales, sellerId],
   );
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // Meta ativa = aquela cujo período [start, end] (inclusive) intercepta o mês selecionado
+  // e, para diária, contém a data de referência.
+  const goalInMonth = (g: Goal) => {
+    const ps = parseSaleDate(g.period_start);
+    return ps >= monthStart && ps < monthEnd;
+  };
 
-  // Meta ativa = aquela cujo período [start, end] (inclusive) contém hoje.
   const activeGoal = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
     goals.find((g) => {
       if (g.target_type !== type || g.category_focus !== focus) return false;
-      const ps = parseSaleDate(g.period_start);
-      const pe = parseSaleDate(g.period_end);
-      return ps <= today && today <= pe;
+      if (!goalInMonth(g)) return false;
+      if (type === "diaria") {
+        const ps = parseSaleDate(g.period_start);
+        const pe = parseSaleDate(g.period_end);
+        return ps <= refDate && refDate <= pe;
+      }
+      return true;
     });
 
   const defaultTarget = (type: "diaria" | "semanal" | "mensal", focus: "total" | "acessorios" = "total") =>
@@ -215,20 +229,21 @@ function SellerDashboardView({
 
   const fmtBR = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-  // Diária: sempre o dia de hoje.
-  const dayEnd = new Date(today); dayEnd.setDate(today.getDate() + 1);
-  const totalDia = sumInRange(today, dayEnd);
+  // Diária: usa a data de referência (hoje se mês atual, último dia do mês selecionado caso contrário).
+  const dayEnd = new Date(refDate); dayEnd.setDate(refDate.getDate() + 1);
+  const totalDia = sumInRange(refDate, dayEnd);
   const targetDiaria = activeGoal("diaria")?.target_value ?? defaultTarget("diaria");
 
-  // Semanal: se o admin selecionou uma semana (1..4), usa a meta com aquele week_number.
-  // Caso contrário, usa a meta semanal cujo período contém hoje.
+  // Semanal: se o admin selecionou uma semana (1..4), usa a meta com aquele week_number DO MÊS SELECIONADO.
+  // Caso contrário, usa a meta semanal do mês selecionado cujo período contém refDate.
   const goalSemanal =
     selectedWeek != null
       ? goals.find(
           (g) =>
             g.target_type === "semanal" &&
             g.category_focus === "total" &&
-            g.week_number === selectedWeek,
+            g.week_number === selectedWeek &&
+            goalInMonth(g),
         )
       : activeGoal("semanal");
   let totalSemana = 0;
@@ -246,7 +261,7 @@ function SellerDashboardView({
   }
   const targetSemanal = goalSemanal?.target_value ?? defaultTarget("semanal");
 
-  // Mensal: usa período da meta se houver; senão mês corrente.
+  // Mensal: usa período da meta se houver; senão o mês selecionado.
   const goalMensal = activeGoal("mensal");
   let totalMes = 0;
   let mesLabel: string | null = null;
@@ -257,20 +272,19 @@ function SellerDashboardView({
     totalMes = sumInRange(from, toExcl);
     mesLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalMensal.period_end))}`;
   } else {
-    const from = new Date(today.getFullYear(), today.getMonth(), 1);
-    const toExcl = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    totalMes = sumInRange(from, toExcl);
+    totalMes = sumInRange(monthStart, monthEnd);
   }
   const targetMensal = goalMensal?.target_value ?? defaultTarget("mensal");
 
-  // Quando uma semana está selecionada, comissões e gráfico refletem o período da semana.
-  const weekScopedVendas =
-    selectedWeek != null && semanaFrom && semanaToExcl
-      ? vendas.filter((v) => {
-          const d = parseSaleDate(v.sale_date);
-          return d >= semanaFrom! && d < semanaToExcl!;
-        })
-      : vendas;
+  // Escopo de comissões/gráfico:
+  // - Se uma semana está selecionada, usa o período da semana.
+  // - Caso contrário, usa o mês selecionado.
+  const scopeFrom = selectedWeek != null && semanaFrom ? semanaFrom : monthStart;
+  const scopeToExcl = selectedWeek != null && semanaToExcl ? semanaToExcl : monthEnd;
+  const weekScopedVendas = vendas.filter((v) => {
+    const d = parseSaleDate(v.sale_date);
+    return d >= scopeFrom && d < scopeToExcl;
+  });
 
   const comissoes = weekScopedVendas.reduce((s, v) => s + Number(v.commission_value), 0);
   const comissoesAparelhos = weekScopedVendas.filter(v => v.category === CATEGORIA_APARELHO).reduce((s, v) => s + Number(v.commission_value), 0);
@@ -281,6 +295,21 @@ function SellerDashboardView({
       const days = Math.max(1, Math.round((semanaToExcl.getTime() - semanaFrom.getTime()) / 86400000));
       return Array.from({ length: days }).map((_, i) => {
         const day = new Date(semanaFrom!); day.setDate(semanaFrom!.getDate() + i);
+        const next = new Date(day); next.setDate(day.getDate() + 1);
+        const total = vendas
+          .filter(v => { const d = parseSaleDate(v.sale_date); return d >= day && d < next; })
+          .reduce((s, v) => s + Number(v.sale_value), 0);
+        return {
+          label: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          valor: total,
+        };
+      });
+    }
+    // Mês selecionado diferente do atual: mostrar todos os dias do mês.
+    if (!isCurrentMonth) {
+      const days = Math.round((monthEnd.getTime() - monthStart.getTime()) / 86400000);
+      return Array.from({ length: days }).map((_, i) => {
+        const day = new Date(monthStart); day.setDate(monthStart.getDate() + i);
         const next = new Date(day); next.setDate(day.getDate() + 1);
         const total = vendas
           .filter(v => { const d = parseSaleDate(v.sale_date); return d >= day && d < next; })
@@ -304,7 +333,7 @@ function SellerDashboardView({
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendas, range, selectedWeek, semanaFrom?.getTime(), semanaToExcl?.getTime()]);
+  }, [vendas, range, selectedWeek, isCurrentMonth, monthStart.getTime(), monthEnd.getTime(), semanaFrom?.getTime(), semanaToExcl?.getTime()]);
 
   const pieData = [
     { name: "Aparelhos", value: Math.round(comissoesAparelhos) },
