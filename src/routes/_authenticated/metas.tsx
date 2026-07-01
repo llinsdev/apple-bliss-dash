@@ -67,8 +67,6 @@ function Metas() {
   ];
 
   const goalsDoMes = goals.filter(goalInMonth);
-  // refDate is referenced to keep hook usage explicit and future-proof
-  void refDate;
 
   return (
     <AppLayout>
