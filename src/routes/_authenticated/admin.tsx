@@ -67,13 +67,14 @@ function Admin() {
     },
   });
   const rolesQ = useQuery({
-    queryKey: ["admin", "roles"],
+    queryKey: ["admin", "user_roles"],
     queryFn: async (): Promise<RoleRow[]> => {
       const { data, error } = await supabase.from("user_roles").select("user_id, role");
       if (error) throw error;
       return (data ?? []) as RoleRow[];
     },
   });
+
   const { data: sales = [] } = useSales();
   const { data: goals = [] } = useAllGoals();
   const del = useDeleteGoal();
@@ -82,13 +83,7 @@ function Admin() {
   const [openGoal, setOpenGoal] = useState(false);
   const [defaultUserId, setDefaultUserId] = useState<string | null>(null);
 
-  const { startMonth, nextMonth } = useMemo(() => {
-    const d = new Date();
-    return {
-      startMonth: new Date(d.getFullYear(), d.getMonth(), 1),
-      nextMonth: new Date(d.getFullYear(), d.getMonth() + 1, 1),
-    };
-  }, []);
+  const { startDate: startMonth, endDateExcl: nextMonth } = useSelectedMonth();
 
   const totalsByUser = useMemo(() => {
     const m = new Map<string, number>();
@@ -100,6 +95,7 @@ function Admin() {
     }
     return m;
   }, [sales, startMonth, nextMonth]);
+
 
   const profiles = profilesQ.data ?? [];
   const roles = rolesQ.data ?? [];
@@ -242,15 +238,40 @@ function GoalDialog({
   const upsert = useUpsertGoal();
   const { year, month } = useSelectedMonth();
   const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const defaultStart = toISO(new Date(year, month, 1));
-  const defaultEnd = toISO(new Date(year, month + 1, 0));
+  const monthStartISO = toISO(new Date(year, month, 1));
+  const monthEndISO = toISO(new Date(year, month + 1, 0));
+  const weekRangeISO = (wn: number) => {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDay = Math.min(1 + (wn - 1) * 7, daysInMonth);
+    const endDay = Math.min(startDay + 6, daysInMonth);
+    return { s: toISO(new Date(year, month, startDay)), e: toISO(new Date(year, month, endDay)) };
+  };
+  const initialType: GoalType = editing?.target_type ?? "mensal";
+  const initialWeek = editing?.week_number ? String(editing.week_number) : "1";
+  const initialRange =
+    !editing && initialType === "semanal"
+      ? weekRangeISO(parseInt(initialWeek, 10))
+      : { s: monthStartISO, e: monthEndISO };
   const [userId, setUserId] = useState(editing?.user_id ?? defaultUserId ?? "");
   const [value, setValue] = useState(editing ? String(editing.target_value) : "");
-  const [type, setType] = useState<GoalType>(editing?.target_type ?? "mensal");
+  const [type, setType] = useState<GoalType>(initialType);
   const [focus, setFocus] = useState<GoalFocus>(editing?.category_focus ?? "total");
-  const [start, setStart] = useState(editing?.period_start ?? defaultStart);
-  const [end, setEnd] = useState(editing?.period_end ?? defaultEnd);
-  const [weekNumber, setWeekNumber] = useState<string>(editing?.week_number ? String(editing.week_number) : "1");
+  const [start, setStart] = useState(editing?.period_start ?? initialRange.s);
+  const [end, setEnd] = useState(editing?.period_end ?? initialRange.e);
+  const [weekNumber, setWeekNumber] = useState<string>(initialWeek);
+
+  // Ao alternar tipo/semana em uma NOVA meta, ajusta o intervalo automaticamente.
+  useEffect(() => {
+    if (editing) return;
+    if (type === "semanal") {
+      const r = weekRangeISO(parseInt(weekNumber, 10) || 1);
+      setStart(r.s); setEnd(r.e);
+    } else {
+      setStart(monthStartISO); setEnd(monthEndISO);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, weekNumber, year, month]);
+
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
