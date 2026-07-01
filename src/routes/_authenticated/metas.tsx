@@ -17,7 +17,6 @@ function Metas() {
   const { data: vendas = [] } = useSales();
   const { data: goals = [] } = useMyGoals();
   const { startDate: monthStart, endDateExcl: monthEnd } = useSelectedMonth();
-  const refDate = useRefDate();
 
   const goalInMonth = (g: Goal) => {
     const ps = parseSaleDate(g.period_start);
