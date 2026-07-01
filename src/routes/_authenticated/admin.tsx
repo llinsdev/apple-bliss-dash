@@ -240,13 +240,16 @@ function GoalDialog({
   onClose: () => void;
 }) {
   const upsert = useUpsertGoal();
-  const today = new Date().toISOString().slice(0, 10);
+  const { year, month } = useSelectedMonth();
+  const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const defaultStart = toISO(new Date(year, month, 1));
+  const defaultEnd = toISO(new Date(year, month + 1, 0));
   const [userId, setUserId] = useState(editing?.user_id ?? defaultUserId ?? "");
   const [value, setValue] = useState(editing ? String(editing.target_value) : "");
   const [type, setType] = useState<GoalType>(editing?.target_type ?? "mensal");
   const [focus, setFocus] = useState<GoalFocus>(editing?.category_focus ?? "total");
-  const [start, setStart] = useState(editing?.period_start ?? today);
-  const [end, setEnd] = useState(editing?.period_end ?? today);
+  const [start, setStart] = useState(editing?.period_start ?? defaultStart);
+  const [end, setEnd] = useState(editing?.period_end ?? defaultEnd);
   const [weekNumber, setWeekNumber] = useState<string>(editing?.week_number ? String(editing.week_number) : "1");
 
   const submit = (e: React.FormEvent) => {
