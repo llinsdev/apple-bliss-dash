@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { useSales } from "@/hooks/use-sales";
 import { useMyGoals, type Goal } from "@/hooks/use-goals";
 import { METAS_DEFAULT, formatBRL, CATEGORIA_ACESSORIO, parseSaleDate } from "@/lib/mock-data";
-import { useSelectedMonth, useRefDate } from "@/lib/selected-month";
+import { useSelectedMonth } from "@/lib/selected-month";
 import { MonthSelector } from "@/components/month-selector";
 import { Trophy, Target, CheckCircle2 } from "lucide-react";
 
