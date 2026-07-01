@@ -322,7 +322,7 @@ function SellerDashboardView({
     }
     const days = range === "hoje" ? 1 : range === "7" ? 7 : 30;
     return Array.from({ length: days }).map((_, i) => {
-      const day = new Date(); day.setDate(day.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
+      const day = new Date(refDate); day.setDate(refDate.getDate() - (days - 1 - i)); day.setHours(0, 0, 0, 0);
       const next = new Date(day); next.setDate(day.getDate() + 1);
       const total = vendas
         .filter(v => { const d = parseSaleDate(v.sale_date); return d >= day && d < next; })
@@ -332,6 +332,7 @@ function SellerDashboardView({
         valor: total,
       };
     });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendas, range, selectedWeek, isCurrentMonth, monthStart.getTime(), monthEnd.getTime(), semanaFrom?.getTime(), semanaToExcl?.getTime()]);
 
