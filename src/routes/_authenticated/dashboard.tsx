@@ -334,7 +334,7 @@ function SellerDashboardView({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendas, range, selectedWeek, isCurrentMonth, monthStart.getTime(), monthEnd.getTime(), semanaFrom?.getTime(), semanaToExcl?.getTime()]);
+  }, [vendas, range, selectedWeek, isCurrentMonth, monthStart.getTime(), monthEnd.getTime(), semanaFrom?.getTime(), semanaToExcl?.getTime(), refDate.getTime()]);
 
   const pieData = [
     { name: "Aparelhos", value: Math.round(comissoesAparelhos) },
