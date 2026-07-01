@@ -265,18 +265,14 @@ function SellerDashboardView({
   const goalMensal = activeGoal("mensal");
   let totalMes = 0;
   let mesLabel: string | null = null;
-  let mesFrom: Date;
-  let mesToExcl: Date;
   if (goalMensal) {
-    mesFrom = parseSaleDate(goalMensal.period_start);
-    mesToExcl = parseSaleDate(goalMensal.period_end);
-    mesToExcl.setDate(mesToExcl.getDate() + 1);
-    totalMes = sumInRange(mesFrom, mesToExcl);
-    mesLabel = `${fmtBR(mesFrom)} – ${fmtBR(parseSaleDate(goalMensal.period_end))}`;
+    const from = parseSaleDate(goalMensal.period_start);
+    const toExcl = parseSaleDate(goalMensal.period_end);
+    toExcl.setDate(toExcl.getDate() + 1);
+    totalMes = sumInRange(from, toExcl);
+    mesLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalMensal.period_end))}`;
   } else {
-    mesFrom = monthStart;
-    mesToExcl = monthEnd;
-    totalMes = sumInRange(mesFrom, mesToExcl);
+    totalMes = sumInRange(monthStart, monthEnd);
   }
   const targetMensal = goalMensal?.target_value ?? defaultTarget("mensal");
 
