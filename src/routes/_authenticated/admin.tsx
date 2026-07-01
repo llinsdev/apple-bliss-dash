@@ -24,6 +24,7 @@ import {
   type Goal, type GoalType, type GoalFocus,
 } from "@/hooks/use-goals";
 import { formatBRL, parseSaleDate } from "@/lib/mock-data";
+import { useSelectedMonth } from "@/lib/selected-month";
 import { ShieldCheck, Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
