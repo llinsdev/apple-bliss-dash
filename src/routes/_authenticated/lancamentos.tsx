@@ -55,6 +55,8 @@ function Lancamentos() {
         </Dialog>
       </header>
 
+      <MonthSelector />
+
       <Card className="overflow-hidden animate-vm-in">
         {isLoading ? (
           <div className="p-6 space-y-2">
@@ -62,9 +64,10 @@ function Lancamentos() {
           </div>
         ) : vendas.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">
-            Nenhuma venda registrada ainda.
+            Nenhum lançamento em {label}.
           </div>
         ) : (
+
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border">
