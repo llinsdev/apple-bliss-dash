@@ -320,3 +320,107 @@ function GoalDialog({
     </DialogContent>
   );
 }
+
+function GoalsByMonth({
+  goals, profiles, onEdit, onDelete,
+}: {
+  goals: Goal[];
+  profiles: ProfileRow[];
+  onEdit: (g: Goal) => void;
+  onDelete: (id: string) => void;
+}) {
+  const groups = useMemo(() => {
+    const map = new Map<string, { label: string; year: number; month: number; items: Goal[] }>();
+    for (const g of goals) {
+      const d = parseSaleDate(g.period_start);
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      let entry = map.get(key);
+      if (!entry) {
+        const label = new Date(y, m, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+        entry = { label: label.charAt(0).toUpperCase() + label.slice(1), year: y, month: m, items: [] };
+        map.set(key, entry);
+      }
+      entry.items.push(g);
+    }
+    const orderKey = (g: Goal) => {
+      const t = g.target_type === "mensal" ? 0 : g.target_type === "semanal" ? 1 : 2;
+      const f = g.category_focus === "total" ? 0 : 1;
+      const w = g.week_number ?? 0;
+      return t * 100 + f * 10 + w;
+    };
+    for (const entry of map.values()) {
+      entry.items.sort((a, b) => orderKey(a) - orderKey(b));
+    }
+    return Array.from(map.values()).sort((a, b) => (b.year - a.year) || (b.month - a.month));
+  }, [goals]);
+
+  if (goals.length === 0) {
+    return (
+      <Card className="animate-vm-in">
+        <CardContent className="p-12 text-center text-sm text-muted-foreground">
+          Nenhuma meta cadastrada ainda.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const labelTipo = (g: Goal) => {
+    if (g.target_type === "semanal") return `Semana ${g.week_number ?? "?"}`;
+    if (g.target_type === "mensal") return g.category_focus === "acessorios" ? "Meta Acessórios" : "Meta Geral";
+    return "Diária";
+  };
+
+  return (
+    <div className="space-y-4">
+      {groups.map(group => (
+        <Card key={`${group.year}-${group.month}`} className="animate-vm-in">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">{group.label}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Vendedor</TableHead>
+                  <TableHead>Foco</TableHead>
+                  <TableHead>Período</TableHead>
+                  <TableHead className="text-right">Alvo</TableHead>
+                  <TableHead className="w-24"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.items.map(g => (
+                  <TableRow key={g.id} className="border-border">
+                    <TableCell className="text-foreground">{labelTipo(g)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {profiles.find(p => p.id === g.user_id)?.full_name ?? g.user_id.slice(0, 8)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{g.category_focus === "total" ? "Total" : "Acessórios"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {parseSaleDate(g.period_start).toLocaleDateString("pt-BR")} → {parseSaleDate(g.period_end).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-right text-primary">{formatBRL(Number(g.target_value))}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(g)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(g.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
