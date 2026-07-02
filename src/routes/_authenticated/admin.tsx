@@ -159,61 +159,16 @@ function Admin() {
         </CardContent>
       </Card>
 
-      <Card className="animate-vm-in">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm text-muted-foreground">Metas cadastradas</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {goals.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              Nenhuma meta cadastrada ainda.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Foco</TableHead>
-                  <TableHead>Período</TableHead>
-                  <TableHead className="text-right">Alvo</TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {goals.map(g => (
-                  <TableRow key={g.id} className="border-border">
-                    <TableCell className="text-foreground">
-                      {profiles.find(p => p.id === g.user_id)?.full_name ?? g.user_id.slice(0,8)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground capitalize">{g.target_type}</TableCell>
-                    <TableCell className="text-muted-foreground">{g.category_focus === "total" ? "Total" : "Acessórios"}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(g.period_start).toLocaleDateString("pt-BR")} → {new Date(g.period_end).toLocaleDateString("pt-BR")}
-                    </TableCell>
-                    <TableCell className="text-right text-primary">{formatBRL(Number(g.target_value))}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8"
-                          onClick={() => { setEditing(g); setDefaultUserId(g.user_id); setOpenGoal(true); }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => del.mutate(g.id, {
-                            onSuccess: () => toast.success("Meta removida"),
-                            onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
-                          })}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <GoalsByMonth
+        goals={goals}
+        profiles={profiles}
+        onEdit={(g) => { setEditing(g); setDefaultUserId(g.user_id); setOpenGoal(true); }}
+        onDelete={(id) => del.mutate(id, {
+          onSuccess: () => toast.success("Meta removida"),
+          onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
+        })}
+      />
+
 
       <Dialog open={openGoal} onOpenChange={(v) => { setOpenGoal(v); if (!v) setEditing(null); }}>
         <GoalDialog
