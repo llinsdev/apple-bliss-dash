@@ -19,6 +19,8 @@ import {
   APARELHO_COMISSAO_PCT, ACESSORIO_COMISSAO_PCT,
 } from "@/hooks/use-sales";
 import { formatBRL, CATEGORIA_APARELHO, parseSaleDate } from "@/lib/mock-data";
+import { useSelectedMonth } from "@/lib/selected-month";
+import { MonthSelector } from "@/components/month-selector";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
@@ -26,9 +28,15 @@ export const Route = createFileRoute("/_authenticated/lancamentos")({
 });
 
 function Lancamentos() {
-  const { data: vendas = [], isLoading } = useSales();
+  const { data: vendasAll = [], isLoading } = useSales();
   const del = useDeleteSale();
   const [open, setOpen] = useState(false);
+  const { startDate, endDateExcl, label } = useSelectedMonth();
+  const vendas = vendasAll.filter(v => {
+    const d = parseSaleDate(v.sale_date);
+    return d >= startDate && d < endDateExcl;
+  });
+
 
   return (
     <AppLayout>
@@ -47,6 +55,8 @@ function Lancamentos() {
         </Dialog>
       </header>
 
+      <MonthSelector />
+
       <Card className="overflow-hidden animate-vm-in">
         {isLoading ? (
           <div className="p-6 space-y-2">
@@ -54,9 +64,10 @@ function Lancamentos() {
           </div>
         ) : vendas.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">
-            Nenhuma venda registrada ainda.
+            Nenhum lançamento em {label}.
           </div>
         ) : (
+
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border">
