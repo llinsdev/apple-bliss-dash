@@ -341,9 +341,12 @@ function GoalDialog({
             </Select>
           </div>
         )}
+        {blockReason && (
+          <p className="text-xs text-muted-foreground">{blockReason}</p>
+        )}
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" disabled={upsert.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button type="submit" disabled={upsert.isPending || !!blockReason || !userId} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             {upsert.isPending ? "Salvando..." : "Salvar"}
           </Button>
         </DialogFooter>
