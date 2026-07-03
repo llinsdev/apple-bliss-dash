@@ -27,6 +27,12 @@ import { formatBRL, parseSaleDate } from "@/lib/mock-data";
 import { useSelectedMonth } from "@/lib/selected-month";
 import { ShieldCheck, Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { MonthSelector } from "@/components/month-selector";
+
+const ALLOWED_SELLER_IDS = new Set<string>([
+  "a97a9546-65d8-420f-9a32-d02afe7060f0", // Mariano
+  "9d6b8f6b-2dc3-4e6a-8ee0-43af047231d0", // Dominique
+]);
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
