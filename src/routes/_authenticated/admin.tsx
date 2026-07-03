@@ -106,6 +106,16 @@ function Admin() {
   const profiles = profilesQ.data ?? [];
   const roles = rolesQ.data ?? [];
   const roleOf = (uid: string) => roles.find(r => r.user_id === uid)?.role ?? "vendedor";
+  const adminIds = useMemo(
+    () => new Set(roles.filter(r => r.role === "admin").map(r => r.user_id)),
+    [roles],
+  );
+  const eligibleSellers = useMemo(
+    () => profiles
+      .filter(p => ALLOWED_SELLER_IDS.has(p.id) && !adminIds.has(p.id))
+      .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-BR")),
+    [profiles, adminIds],
+  );
 
   return (
     <AppLayout>
