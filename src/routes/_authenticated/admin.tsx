@@ -131,6 +131,8 @@ function Admin() {
         </Button>
       </header>
 
+      <MonthSelector />
+
       <Card className="mb-6 animate-vm-in">
         <CardHeader>
           <CardTitle className="text-sm text-muted-foreground">Vendedores</CardTitle>
