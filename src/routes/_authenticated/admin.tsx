@@ -202,11 +202,12 @@ function Admin() {
 }
 
 function GoalDialog({
-  editing, defaultUserId, profiles, onClose,
+  editing, defaultUserId, profiles, adminIds, onClose,
 }: {
   editing: Goal | null;
   defaultUserId: string | null;
   profiles: ProfileRow[];
+  adminIds: Set<string>;
   onClose: () => void;
 }) {
   const upsert = useUpsertGoal();
