@@ -409,9 +409,10 @@ function SellerDashboardView({
                 variant={range === r ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setRange(r)}
+                disabled={!isCurrentMonth}
                 className={range === r ? "bg-primary hover:bg-primary/90 text-primary-foreground h-7" : "h-7 text-muted-foreground hover:text-foreground"}
               >
-                {r === "hoje" ? "Hoje" : `${r} dias`}
+                {r === "hoje" ? "Hoje" : r === "7" ? "Últ. 7d" : "Últ. 30d"}
               </Button>
             ))}
           </div>

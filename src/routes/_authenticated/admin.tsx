@@ -27,6 +27,12 @@ import { formatBRL, parseSaleDate } from "@/lib/mock-data";
 import { useSelectedMonth } from "@/lib/selected-month";
 import { ShieldCheck, Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { MonthSelector } from "@/components/month-selector";
+
+const ALLOWED_SELLER_IDS = new Set<string>([
+  "a97a9546-65d8-420f-9a32-d02afe7060f0", // Mariano
+  "9d6b8f6b-2dc3-4e6a-8ee0-43af047231d0", // Dominique
+]);
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -100,6 +106,16 @@ function Admin() {
   const profiles = profilesQ.data ?? [];
   const roles = rolesQ.data ?? [];
   const roleOf = (uid: string) => roles.find(r => r.user_id === uid)?.role ?? "vendedor";
+  const adminIds = useMemo(
+    () => new Set(roles.filter(r => r.role === "admin").map(r => r.user_id)),
+    [roles],
+  );
+  const eligibleSellers = useMemo(
+    () => profiles
+      .filter(p => ALLOWED_SELLER_IDS.has(p.id) && !adminIds.has(p.id))
+      .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-BR")),
+    [profiles, adminIds],
+  );
 
   return (
     <AppLayout>
@@ -114,6 +130,8 @@ function Admin() {
           <Link to="/integracoes">Integrações</Link>
         </Button>
       </header>
+
+      <MonthSelector />
 
       <Card className="mb-6 animate-vm-in">
         <CardHeader>
@@ -131,7 +149,7 @@ function Admin() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {profiles.map(p => {
+              {eligibleSellers.map(p => {
                 const userGoals = goals.filter(g => g.user_id === p.id);
                 return (
                   <TableRow key={p.id} className="border-border">
@@ -174,7 +192,8 @@ function Admin() {
         <GoalDialog
           editing={editing}
           defaultUserId={defaultUserId}
-          profiles={profiles}
+          profiles={eligibleSellers}
+          adminIds={adminIds}
           onClose={() => { setOpenGoal(false); setEditing(null); }}
         />
       </Dialog>
@@ -183,11 +202,12 @@ function Admin() {
 }
 
 function GoalDialog({
-  editing, defaultUserId, profiles, onClose,
+  editing, defaultUserId, profiles, adminIds, onClose,
 }: {
   editing: Goal | null;
   defaultUserId: string | null;
   profiles: ProfileRow[];
+  adminIds: Set<string>;
   onClose: () => void;
 }) {
   const upsert = useUpsertGoal();
@@ -228,10 +248,21 @@ function GoalDialog({
   }, [type, weekNumber, year, month]);
 
 
+  const isAdminTarget = !!userId && adminIds.has(userId);
+  const isAllowed = ALLOWED_SELLER_IDS.has(userId);
+  const blockReason = !userId
+    ? null
+    : isAdminTarget
+      ? "Não é permitido criar metas para administradores."
+      : !isAllowed
+        ? "Apenas Mariano e Dominique podem receber metas no MVP."
+        : null;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const v = parseFloat(value);
     if (!userId || isNaN(v)) return;
+    if (blockReason) return;
     const wn = type === "semanal" ? parseInt(weekNumber, 10) : null;
     upsert.mutate(
       { id: editing?.id, user_id: userId, target_value: v, target_type: type, category_focus: focus, period_start: start, period_end: end, week_number: wn },
@@ -310,9 +341,12 @@ function GoalDialog({
             </Select>
           </div>
         )}
+        {blockReason && (
+          <p className="text-xs text-muted-foreground">{blockReason}</p>
+        )}
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" disabled={upsert.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button type="submit" disabled={upsert.isPending || !!blockReason || !userId} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             {upsert.isPending ? "Salvando..." : "Salvar"}
           </Button>
         </DialogFooter>
