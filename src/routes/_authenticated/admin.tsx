@@ -149,7 +149,7 @@ function Admin() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {profiles.map(p => {
+              {eligibleSellers.map(p => {
                 const userGoals = goals.filter(g => g.user_id === p.id);
                 return (
                   <TableRow key={p.id} className="border-border">
