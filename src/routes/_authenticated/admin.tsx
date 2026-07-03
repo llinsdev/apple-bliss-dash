@@ -248,10 +248,21 @@ function GoalDialog({
   }, [type, weekNumber, year, month]);
 
 
+  const isAdminTarget = !!userId && adminIds.has(userId);
+  const isAllowed = ALLOWED_SELLER_IDS.has(userId);
+  const blockReason = !userId
+    ? null
+    : isAdminTarget
+      ? "Não é permitido criar metas para administradores."
+      : !isAllowed
+        ? "Apenas Mariano e Dominique podem receber metas no MVP."
+        : null;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const v = parseFloat(value);
     if (!userId || isNaN(v)) return;
+    if (blockReason) return;
     const wn = type === "semanal" ? parseInt(weekNumber, 10) : null;
     upsert.mutate(
       { id: editing?.id, user_id: userId, target_value: v, target_type: type, category_focus: focus, period_start: start, period_end: end, week_number: wn },
