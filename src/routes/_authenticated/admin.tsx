@@ -192,7 +192,8 @@ function Admin() {
         <GoalDialog
           editing={editing}
           defaultUserId={defaultUserId}
-          profiles={profiles}
+          profiles={eligibleSellers}
+          adminIds={adminIds}
           onClose={() => { setOpenGoal(false); setEditing(null); }}
         />
       </Dialog>
