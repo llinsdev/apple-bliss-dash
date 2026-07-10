@@ -158,7 +158,7 @@ function AdminSellerSwitcher({
             key={w}
             variant={selectedWeek === w ? "default" : "outline"}
             size="sm"
-            onClick={() => setSelectedWeek(w)}
+            onClick={() => setSelectedWeek(Number(w))}
             className={selectedWeek === w ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8" : "h-8"}
           >
             Semana {w}
@@ -234,32 +234,62 @@ function SellerDashboardView({
   const totalDia = sumInRange(refDate, dayEnd);
   const targetDiaria = activeGoal("diaria")?.target_value ?? defaultTarget("diaria");
 
-  // Semanal: se o admin selecionou uma semana (1..4), usa a meta com aquele week_number DO MÊS SELECIONADO.
-  // Caso contrário, usa a meta semanal do mês selecionado cujo período contém refDate.
-  const goalSemanal =
-    selectedWeek != null
-      ? goals.find(
-          (g) =>
-            g.target_type === "semanal" &&
-            g.category_focus === "total" &&
-            g.week_number === selectedWeek &&
-            goalInMonth(g),
-        )
-      : activeGoal("semanal");
-  let totalSemana = 0;
-  let semanaLabel: string | null = null;
-  let semanaFrom: Date | null = null;
-  let semanaToExcl: Date | null = null;
-  if (goalSemanal) {
-    const from = parseSaleDate(goalSemanal.period_start);
-    const toExcl = parseSaleDate(goalSemanal.period_end);
-    toExcl.setDate(toExcl.getDate() + 1);
-    totalSemana = sumInRange(from, toExcl);
-    semanaLabel = `${fmtBR(from)} – ${fmtBR(parseSaleDate(goalSemanal.period_end))}`;
-    semanaFrom = from;
-    semanaToExcl = toExcl;
-  }
-  const targetSemanal = goalSemanal?.target_value ?? defaultTarget("semanal");
+  // Semanal: recomputa determinísticamente ao trocar selectedWeek, mês ou vendas.
+  const weekly = useMemo(() => {
+    let goal: Goal | undefined;
+    if (selectedWeek != null) {
+      goal = goals.find(
+        (g) =>
+          g.target_type === "semanal" &&
+          g.category_focus === "total" &&
+          Number(g.week_number) === Number(selectedWeek) &&
+          goalInMonth(g),
+      );
+    } else {
+      goal = goals.find((g) => {
+        if (g.target_type !== "semanal" || g.category_focus !== "total") return false;
+        if (!goalInMonth(g)) return false;
+        const ps = parseSaleDate(g.period_start);
+        const pe = parseSaleDate(g.period_end);
+        return ps <= refDate && refDate <= pe;
+      });
+    }
+    if (goal) {
+      const from = parseSaleDate(goal.period_start);
+      const toExcl = parseSaleDate(goal.period_end);
+      toExcl.setDate(toExcl.getDate() + 1);
+      const total = vendas
+        .filter((v) => { const d = parseSaleDate(v.sale_date); return d >= from && d < toExcl; })
+        .reduce((s, v) => s + Number(v.sale_value), 0);
+      return {
+        goal,
+        from,
+        toExcl,
+        total,
+        label: `${fmtBR(from)} – ${fmtBR(parseSaleDate(goal.period_end))}`,
+        target: goal.target_value,
+      };
+    }
+    return {
+      goal: undefined as Goal | undefined,
+      from: null as Date | null,
+      toExcl: null as Date | null,
+      total: 0,
+      label:
+        selectedWeek != null
+          ? `Semana ${selectedWeek} — sem meta cadastrada`
+          : "Sem período cadastrado",
+      target: defaultTarget("semanal"),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals, selectedWeek, vendas, monthStart.getTime(), monthEnd.getTime(), refDate.getTime()]);
+
+  const goalSemanal = weekly.goal;
+  const totalSemana = weekly.total;
+  const semanaLabel = weekly.label;
+  const semanaFrom = weekly.from;
+  const semanaToExcl = weekly.toExcl;
+  const targetSemanal = weekly.target;
 
   // Mensal: usa período da meta se houver; senão o mês selecionado.
   const goalMensal = activeGoal("mensal");
