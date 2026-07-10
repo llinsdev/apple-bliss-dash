@@ -158,7 +158,7 @@ function AdminSellerSwitcher({
             key={w}
             variant={selectedWeek === w ? "default" : "outline"}
             size="sm"
-            onClick={() => setSelectedWeek(w)}
+            onClick={() => setSelectedWeek(Number(w))}
             className={selectedWeek === w ? "bg-primary hover:bg-primary/90 text-primary-foreground h-8" : "h-8"}
           >
             Semana {w}

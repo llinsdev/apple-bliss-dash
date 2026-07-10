@@ -1,95 +1,79 @@
+## Bug: Meta Semanal não recalcula ao trocar de semana
 
-# Plano de implementação — mudanças mínimas
+### Escopo
+Somente `src/routes/_authenticated/dashboard.tsx` (bloco semanal do `SellerDashboardView` + seletor em `AdminSellerSwitcher`). Sem mexer em RLS, hooks, `useSelectedMonth`, Metas/Lançamentos/Admin, tokens de tema ou layout.
 
-Escopo: apenas os itens 1–3 do brief. Sem refactor, sem RLS, sem novas tabelas, sem mudanças visuais além do texto dos botões e do MonthSelector no Admin.
+### Diagnóstico
+Confirmei no banco que `goals.week_number` é **number 1..4** e cada semana tem `period_start`/`period_end` distintos (ex.: Julho/2026 → S1 01–08, S2 10–16, S3 17–23, S4 24–31). Portanto o filtro `g.week_number === selectedWeek` é compatível com o DB.
 
----
+Pontos frágeis no código atual que explicam o sintoma relatado (card fica em 01/07–08/07 mesmo após clicar Semana 2):
 
-## 1) `src/routes/_authenticated/admin.tsx`
+1. **Remontagem via `key`**: `SellerDashboardView` é remontado com `key={activeId}-${selectedWeek ?? "all"}`. Isso é usado como “atalho” para resetar estado interno, mas mascara stale-closures de `useMemo` e dificulta debug. Manter, mas não confiar nele para correção lógica.
+2. **`selectedWeek` sem coerção**: hoje os botões passam `number` literal — OK, mas qualquer alteração futura (ex.: `value` de `<select>`) quebraria silenciosamente. Coerção explícita `Number(w)` na origem previne regressão.
+3. **Faltam dependências explícitas no cálculo semanal**: `goalSemanal`, `semanaFrom`, `semanaToExcl`, `totalSemana`, `semanaLabel` são calculados em variáveis soltas dentro do componente (não em `useMemo`). Funciona por render, mas se o filtro `goalInMonth` retornar `undefined` a UI mantém o último `semanaLabel` porque nada obriga fallback visual. Precisamos garantir fallback determinístico.
+4. **Ausência de fallback claro para “sem meta na semana”**: quando `goalSemanal` é `undefined`, `semanaLabel` fica `null` → renderiza "Sem período cadastrado". Trocar por texto explícito por semana selecionada (“Semana N — sem meta cadastrada”) para eliminar ambiguidade visual reportada.
 
-### 1.1 Allow-list + eligibleSellers
-- Adicionar no topo do arquivo (fora do componente):
-  ```ts
-  const ALLOWED_SELLER_IDS = new Set([
-    "a97a9546-65d8-420f-9a32-d02afe7060f0", // Mariano
-    "9d6b8f6b-2dc3-4e6a-8ee0-43af047231d0", // Dominique
-  ]);
-  ```
-- Dentro de `Admin()`, derivar:
-  ```ts
-  const adminIds = useMemo(
-    () => new Set(roles.filter(r => r.role === "admin").map(r => r.user_id)),
-    [roles],
+### Correção (mínima, cirúrgica)
+
+Editar apenas `src/routes/_authenticated/dashboard.tsx`:
+
+**A. Seletor de semanas (`AdminSellerSwitcher`)**
+- Trocar `onClick={() => setSelectedWeek(w)}` por `onClick={() => setSelectedWeek(Number(w))}` (defensivo).
+- Manter o `key` de remontagem como está.
+
+**B. Cálculo semanal (`SellerDashboardView`)**
+Envolver o bloco semanal em um `useMemo` único que retorna `{ goalSemanal, semanaFrom, semanaToExcl, totalSemana, semanaLabel, targetSemanal }`, com dependências:
+`[goals, selectedWeek, monthStart.getTime(), monthEnd.getTime(), refDate.getTime(), vendas]`.
+
+Lógica interna:
+```
+if (selectedWeek != null) {
+  goalSemanal = goals.find(g =>
+    g.target_type === 'semanal' &&
+    g.category_focus === 'total' &&
+    Number(g.week_number) === Number(selectedWeek) &&
+    goalInMonth(g)
   );
-  const eligibleSellers = useMemo(
-    () => profiles
-      .filter(p => ALLOWED_SELLER_IDS.has(p.id) && !adminIds.has(p.id))
-      .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-BR")),
-    [profiles, adminIds],
-  );
-  ```
-- Substituir o `profiles.map(...)` da tabela "Vendedores" por `eligibleSellers.map(...)` (mantendo colunas e classes atuais).
-- Passar `profiles={eligibleSellers}` para `GoalDialog` (o `Select` de vendedor passa a listar só Mariano/Dominique).
-- `GoalsByMonth` continua recebendo `profiles={profiles}` completo (para conseguir mostrar o nome em metas antigas eventualmente atribuídas a admin, sem apagá-las).
+} else {
+  goalSemanal = activeGoal('semanal'); // período contém refDate
+}
 
-### 1.2 Guard rails no GoalDialog
-- Receber também `adminIds: Set<string>` como prop (ou derivar novamente).
-- Calcular:
-  ```ts
-  const isAllowed = ALLOWED_SELLER_IDS.has(userId);
-  const isAdminTarget = adminIds.has(userId);
-  const blockReason = !userId
-    ? null
-    : isAdminTarget
-      ? "Não é permitido criar metas para administradores."
-      : !isAllowed
-        ? "Apenas Mariano e Dominique podem receber metas no MVP."
-        : null;
-  ```
-- No `submit`: `if (blockReason) return;`
-- No botão salvar: `disabled={upsert.isPending || !!blockReason || !userId}`
-- Renderizar `blockReason` como `<p className="text-xs text-muted-foreground">…</p>` logo acima do `DialogFooter` (não altera cores/tema).
+if (goalSemanal) {
+  semanaFrom = parseSaleDate(goalSemanal.period_start);
+  semanaToExcl = addDays(parseSaleDate(goalSemanal.period_end), 1);
+  totalSemana = sumInRange(semanaFrom, semanaToExcl);
+  semanaLabel = `${fmtBR(semanaFrom)} – ${fmtBR(parseSaleDate(goalSemanal.period_end))}`;
+  targetSemanal = goalSemanal.target_value;
+} else {
+  semanaFrom = null; semanaToExcl = null;
+  totalSemana = 0;
+  semanaLabel = selectedWeek != null
+    ? `Semana ${selectedWeek} — sem meta cadastrada`
+    : 'Sem período cadastrado';
+  targetSemanal = defaultTarget('semanal');
+}
+```
 
-### 1.3 MonthSelector visível
-- Importar `MonthSelector` (`@/components/month-selector`).
-- Renderizar `<MonthSelector />` **logo abaixo do `<header>`** (padrão das outras telas). Nenhuma outra mudança de layout.
+Isto garante:
+- Recomputação real ao trocar `selectedWeek` (dependência explícita).
+- Fallback claro quando a semana não tem meta (zera valor e mostra rótulo por semana).
+- Nenhum vazamento do label da semana anterior.
 
----
+**C. Escopo do gráfico/comissões**
+Já usa `semanaFrom`/`semanaToExcl` quando `selectedWeek != null`. Continua igual (agora consumindo o valor derivado do `useMemo`).
 
-## 2) `src/routes/_authenticated/dashboard.tsx`
+### Fora do escopo
+- Não introduzir seletor de semana para vendedor comum (apenas admin, como hoje).
+- Não alterar `useSelectedMonth`, hooks de dados, RLS, cores, fontes ou layout.
+- Não trocar `commission_value` nem regra de comissão.
 
-Alterações **apenas** no toggle do card "Vendas no período" (linhas ~405–417):
-- Labels:
-  - `"hoje"` → `"Hoje"` (mantém)
-  - `"7"` → `"Últ. 7d"`
-  - `"30"` → `"Últ. 30d"`
-- Adicionar `disabled={!isCurrentMonth}` em cada botão do toggle. `isCurrentMonth` já está disponível via `useSelectedMonth()` no componente.
-- Nada muda em cálculos, metas semanais, filtros ou gráfico.
+### Verificação manual (após implementação)
+1. Julho/2026, seller com metas 1–4: clicar S1 → 01/07–08/07 e soma coerente.
+2. Clicar S2 → muda para 10/07–16/07, valores recalculam (ou zeram se sem vendas).
+3. Apagar meta S3 e clicar S3 → card mostra “Semana 3 — sem meta cadastrada”, R$ 0,00, 0%.
+4. Voltar a “Todas” → volta à lógica de semana que contém `refDate`.
+5. Metas mensais e diária não mudam ao alternar semanas.
+6. Identidade visual preservada (dark, Inter, vermelho #fd0241).
 
----
-
-## 3) Fora do escopo (não tocar)
-
-- `useSales`, `useAllGoals`, `useMyGoals` — inalterados.
-- RLS, migrações, schemas — inalterados.
-- `metas.tsx`, `lancamentos.tsx` — inalterados.
-- `selected-month.tsx`, `MonthSelector` — inalterados.
-- Cores, fonte, dark mode — inalterados.
-
----
-
-## Entregáveis pós-implementação
-
-**A) Arquivos alterados**
-- `src/routes/_authenticated/admin.tsx` — allow-list, eligibleSellers, guard rails no GoalDialog, `<MonthSelector />` no header.
-- `src/routes/_authenticated/dashboard.tsx` — rótulos "Últ. 7d/30d" e `disabled` quando não é mês atual.
-
-**B) Checklist de validação manual**
-- [ ] Admin: `MonthSelector` aparece no topo e ao trocar o mês, "Vendas (mês)" atualiza.
-- [ ] Admin: tabela e `Select` de vendedor mostram apenas Mariano e Dominique.
-- [ ] Admin: com admin selecionado no dialog, botão "Salvar" fica desabilitado com mensagem sobre administradores.
-- [ ] Admin: com user fora do allow-list, botão "Salvar" fica desabilitado com a mensagem do MVP.
-- [ ] Admin: metas antigas continuam aparecendo em `GoalsByMonth` (nenhuma exclusão).
-- [ ] Dashboard: botões renderizam como "Hoje / Últ. 7d / Últ. 30d".
-- [ ] Dashboard: em mês diferente do atual, os três botões ficam desabilitados.
-- [ ] Identidade visual mantida (dark, Inter, vermelho `#fd0241`).
+### Arquivos alterados
+- `src/routes/_authenticated/dashboard.tsx` (único)
